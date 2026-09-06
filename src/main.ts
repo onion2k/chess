@@ -51,10 +51,7 @@ viewer.setQuality('draft');
 viewer.setEnvironment('studio');
 viewer.setEnvStrength(0.3);
 viewer.setKeyLight({ elevation: Math.PI / 4, azimuth: -Math.PI / 4, strength: 1, warmth: 0.3, size: 0.08 });
-// matte, not one of the wood or cloth tables: at this size — a board three
-// hundred millimetres across — the procedural tables render the whole frame
-// black, in artshape's own page as well as here
-viewer.setTable('matte');
+viewer.setTable('walnut');
 viewer.setLens(46);
 viewer.setFilm({ tonemap: 1, vignette: 0.3, grain: 0.25, fringe: 0.3 });
 

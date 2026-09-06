@@ -39,9 +39,13 @@ stays readable:
 Worth sending back to artshape: `moveAll` is a plain win for anything
 whose subject is made of parts that move together.
 
-## A bug found, not fixed
+## A fix sent back
 
-Every table but `matte` — oak, walnut, slate, linen, velvet, silk —
-renders the whole frame black when the subject is as large as a
-chessboard. It reproduces in artshape's own page on the `chess` example,
-so it is not something this copy did; the game asks for `matte`.
+The black-frame bug this game found — every table but matte rendering the
+whole frame black — was a real defect in `render/shaders.ts`, and it is
+fixed in artshape as well as here. `seen` guarded its reflection ray with
+`dir.z >= -1e-4`, a test a NaN passes rather than fails, so a ray that was
+not a direction reached the table and every surface that reads the point it
+is given answered NaN; that reached the light probe, which is prefiltered
+and read by everything, and the picture went black. The guard is now
+written so a NaN fails it. See artshape's ROADMAP for the whole account.

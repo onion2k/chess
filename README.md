@@ -1,9 +1,9 @@
 # Chess
 
 A game of chess played on a precious-metals set: six men in silver and
-six in gold, enamelled and stone-set, standing on an art deco board,
-drawn by [artshape](https://github.com/) — the renderer, vendored, with
-no editor and no controls.
+six in gold, enamelled and stone-set, standing on an art deco board on a
+walnut table, drawn by artshape — the renderer, vendored, with no editor
+and no controls.
 
     npm install
     npm run dev
