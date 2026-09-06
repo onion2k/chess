@@ -62,11 +62,13 @@ interface Livery {
   metal: string;
   /** Polished for the turned collars and the base's steps, satin for the rest. */
   bright: string;
+  /** The enamel let into the base: the one colour on an otherwise plain man. */
+  inlay: string;
 }
 
 export const LIVERY: Record<'w' | 'b', Livery> = {
-  w: { metal: 'silver', bright: 'silver' },
-  b: { metal: 'gold', bright: 'gold' },
+  w: { metal: 'silver', bright: 'silver', inlay: 'cobalt' },
+  b: { metal: 'gold', bright: 'gold', inlay: 'ruby' },
 };
 
 /**
@@ -77,19 +79,28 @@ export const LIVERY: Record<'w' | 'b', Livery> = {
  * disc's, `rise` how far the flare climbs; a king stands on a wider foot than
  * a pawn and the rest of him is scaled to it.
  *
- * The plate is centred on its own z, so it is placed at half its thickness to
- * stand on the square. The flare is a bell with its wide end at the bottom.
+ * The step is cut deep enough to leave a shelf between the two tiers, and a
+ * ring of enamel is let into it — the one colour on an otherwise plain man,
+ * and what tells the two armies apart from across the board where the metals
+ * alone can be hard to read at a low angle. The flare's throat is drawn in
+ * inside the upper tier so that nothing overhangs the ring.
+ *
+ * A plate is centred on its own z, so it is placed at half its height to
+ * stand on the square; with two tiers it is twice its thickness tall. `bore`
+ * is a diameter, not a radius.
  */
 const base = (l: Livery, radius: number, rise: number) => `material ${l.metal} satin
 
-part foot  = plate(roundel(radius: ${radius}), thickness: 1.15, tiers: 2, shrink: 0.075, bevel: 0.4) in ${l.bright} polished
-part flare = bell(length: ${rise}, mouth: ${(radius * 0.5).toFixed(2)}, throat: ${(radius * 1.92).toFixed(2)}, wall: 1.0, flare: 1.2) in ${l.metal} satin
+part foot  = plate(roundel(radius: ${radius}), thickness: 1.2, tiers: 2, shrink: 0.16, bevel: 0.4) in ${l.bright} polished
+part inlay = plate(roundel(radius: ${(radius * 0.975).toFixed(2)}), thickness: 0.42, bore: ${(radius * 1.73).toFixed(2)}, bevel: 0.14, enamel: ${l.inlay}) in ${l.bright} polished
+part flare = bell(length: ${rise}, mouth: ${(radius * 0.5).toFixed(2)}, throat: ${(radius * 1.6).toFixed(2)}, wall: 1.0, flare: 1.2) in ${l.metal} satin
 part ring  = band(radius: ${(radius * 0.31).toFixed(2)}, width: 1.3, thickness: 0.55) in ${l.bright} polished
 
 unit base {
-  place foot at (0, 0, 1.15)
-  place flare at (0, 0, 2.3)
-  place ring at (0, 0, ${(2.3 + rise).toFixed(2)})
+  place foot at (0, 0, 1.2)
+  place inlay at (0, 0, 1.32)
+  place flare at (0, 0, 2.4)
+  place ring at (0, 0, ${(2.4 + rise).toFixed(2)})
 }
 `;
 

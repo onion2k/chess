@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { compile } from '../../../vendor/artshape/dsl/index';
+import { groupByMesh } from '../../../vendor/artshape/assembly/groups';
 import { BOARD, MARKERS, pieceSketch } from '../sketches';
 import { PIECE_TYPES } from '../../chess/board';
 
@@ -27,6 +28,16 @@ describe('sketches', () => {
     // and the king half again as tall as a square is wide, as a made set is
     expect(king / 22).toBeGreaterThan(1.2);
     expect(king / 22).toBeLessThan(1.6);
+  });
+
+  it("lets a ring of the army's own enamel into every base", () => {
+    for (const [colour, enamel] of [['w', 'cobalt'], ['b', 'ruby']] as const) {
+      for (const type of PIECE_TYPES) {
+        const { sketch } = compile(pieceSketch(colour, type));
+        const rings = groupByMesh(sketch!.assembly).filter((g) => g.enamel);
+        expect(`${colour}${type}: ${rings.map((r) => r.enamel).join()}`).toBe(`${colour}${type}: ${enamel}`);
+      }
+    }
   });
 
   it('compiles every man of both armies, standing on the origin', () => {

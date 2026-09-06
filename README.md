@@ -78,10 +78,14 @@ tall as a square is wide and the rest stepped down from him, which a test
 holds them to. The horse is cut the way a carver cuts one: a flat slab in
 the piece's own plane, bent up the neck, over the poll and down the face.
 
-Nothing on a man is enamelled or stone-set. The two armies are told apart
-by their metal, as a boxwood set is told apart by its stain — which is
-also what lets **Randomise** recast the whole man rather than part of him.
-The board keeps its enamel squares and its onyx corners.
+The step in the base is cut deep enough to leave a shelf, and a ring of
+enamel is let into it — cobalt for white, ruby for black. It is the one
+colour on an otherwise plain man, and it is what tells the two armies
+apart across the board where the metals alone read poorly at a low angle.
+Nothing else on a man is enamelled and nothing is stone-set, so
+**Randomise** recasts the whole man rather than part of him; the ring
+keeps its colour, since that colour is which side he is on. The board
+keeps its enamel squares and its onyx corners.
 
 The board is in millimetres, as artshape's own sketches are: squares are
 22 apart, their tops 6.8 above the table, a1 at (-77, -77).
