@@ -64,9 +64,29 @@ describe('the set on the renderer', () => {
 
   it('lays markers, and says so only when they move', () => {
     const first = scene.mark('quiet', [[11, -11, TOP]]);
-    expect(first).toBeGreaterThanOrEqual(0);
-    expect(scene.mark('quiet', [[11, -11, TOP]])).toBe(-1);
-    expect(scene.mark('quiet', [])).toBeGreaterThanOrEqual(0);
+    expect(first?.count).toBe(1);
+    // already where they are wanted: nothing to tell the renderer
+    expect(scene.mark('quiet', [[11, -11, TOP]])).toBe(null);
+    // and taken away again, which is a change even though the matrices blank
+    expect(scene.mark('quiet', [])?.count).toBe(0);
+  });
+
+  it('draws only the men standing, not the whole pool it has room for', () => {
+    const men = [
+      { colour: 'w' as const, type: 'q' as const, at: [11, -11, TOP] as [number, number, number], turn: 0 },
+      { colour: 'w' as const, type: 'q' as const, at: [33, -11, TOP] as [number, number, number], turn: 0 },
+    ];
+    const placed = scene.place(men);
+    const queens = placed.filter((p) => p.count > 0);
+    expect(queens.length).toBeGreaterThan(0);
+    for (const p of queens) {
+      const room = p.matrices.length / 16;
+      // two queens of a kind whose pool holds nine: a slice of it is drawn
+      expect(p.count).toBeLessThan(room);
+      expect(p.count % 2).toBe(0);
+    }
+    // and every other kind is told it has none standing
+    expect(placed.some((p) => p.count === 0)).toBe(true);
   });
 
   it('knows how wide and tall each man is, for the pointer', () => {

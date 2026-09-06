@@ -118,6 +118,30 @@ browser: the set stands and is lit, a man lifts and lands, the markers
 fall on the right squares, the promotion is asked for, a takeback undoes
 both plies, and the board turns round when you play black.
 
+## What it costs to load
+
+The bundle is 344 kB, 110 kB over the wire, and the game is on screen in
+well under a tenth of a second on a warm device. Three things got it
+there, and the numbers are worth keeping because each was measured rather
+than guessed:
+
+- **Only the men standing are drawn.** Every kind of man is allocated at
+  the most of him the rules allow — nine queens, ten knights — but a game
+  uses a third of that, and the renderer was drawing the whole pool every
+  frame. `InstanceGroup.count` says how many placements are live, and the
+  scene sets it as men are placed: **1.31M triangles a frame to 186k.**
+- **The parts say how finely to build themselves.** Left to the defaults,
+  a knight's ear 2.4 mm long came out at 2,808 triangles and a collar at
+  3,584. Every part now names its `segments`, `sections` or `sides`:
+  **145k distinct triangles to 59k**, and the meshes build in 38 ms rather
+  than 70. Nothing shows at the distance the game is played from; the
+  numbers were chosen by looking, close up and at the board.
+- **The shaders are stripped of their comments at build time.** The WGSL
+  carries a running commentary that is the best thing in the file to read
+  and the worst thing to send — a fifth of the bundle, which the GPU never
+  sees. `wgsl-minify.ts` takes it out of a production build only:
+  **378 kB to 344 kB**, 123 kB to 110 kB gzipped.
+
 ## Deploying
 
 Every push to `main` builds the game and puts it on GitHub Pages, by the

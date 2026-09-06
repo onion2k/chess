@@ -91,10 +91,10 @@ export const LIVERY: Record<'w' | 'b', Livery> = {
  */
 const base = (l: Livery, radius: number, rise: number) => `material ${l.metal} satin
 
-part foot  = plate(roundel(radius: ${radius}), thickness: 1.2, tiers: 2, shrink: 0.16, bevel: 0.4) in ${l.bright} polished
-part inlay = plate(roundel(radius: ${(radius * 0.975).toFixed(2)}), thickness: 0.42, bore: ${(radius * 1.73).toFixed(2)}, bevel: 0.14, enamel: ${l.inlay}) in ${l.bright} polished
-part flare = bell(length: ${rise}, mouth: ${(radius * 0.5).toFixed(2)}, throat: ${(radius * 1.6).toFixed(2)}, wall: 1.0, flare: 1.2) in ${l.metal} satin
-part ring  = band(radius: ${(radius * 0.31).toFixed(2)}, width: 1.3, thickness: 0.55) in ${l.bright} polished
+part foot  = plate(roundel(radius: ${radius}, segments: 36), thickness: 1.2, tiers: 2, shrink: 0.16, bevel: 0.4) in ${l.bright} polished
+part inlay = plate(roundel(radius: ${(radius * 0.975).toFixed(2)}, segments: 36), thickness: 0.42, bore: ${(radius * 1.73).toFixed(2)}, bevel: 0.14, enamel: ${l.inlay}) in ${l.bright} polished
+part flare = bell(length: ${rise}, mouth: ${(radius * 0.5).toFixed(2)}, throat: ${(radius * 1.6).toFixed(2)}, wall: 1.0, flare: 1.2, rows: 8, segments: 32) in ${l.metal} satin
+part ring  = band(radius: ${(radius * 0.31).toFixed(2)}, width: 1.3, thickness: 0.55, segments: 24) in ${l.bright} polished
 
 unit base {
   place foot at (0, 0, 1.2)
@@ -118,9 +118,9 @@ unit base {
  */
 const bodies: Record<string, (l: Livery) => string> = {
   p: (l) => base(l, 7.0, 2.9) + `
-part shaft = stem(path: through((0,0,0), (0,0,6.6)), radius: 2.35, tip: 0.6, swell: 0.24) in ${l.metal} satin
-part neck  = band(radius: 1.5, width: 1.0, thickness: 0.5) in ${l.bright} polished
-part head  = pearl(radius: 2.5) in ${l.bright} polished
+part shaft = stem(path: through((0,0,0), (0,0,6.6)), radius: 2.35, tip: 0.6, swell: 0.24, sections: 18, sides: 20) in ${l.metal} satin
+part neck  = band(radius: 1.5, width: 1.0, thickness: 0.5, segments: 20) in ${l.bright} polished
+part head  = pearl(radius: 2.5, segments: 20) in ${l.bright} polished
 
 form pawn {
   place base
@@ -130,9 +130,9 @@ form pawn {
 }`,
 
   r: (l) => base(l, 7.8, 3.0) + `
-part shaft  = stem(path: through((0,0,0), (0,0,4.4)), radius: 2.95, tip: 0.88) in ${l.metal} satin
-part rim    = band(radius: 4.55, width: 1.7, thickness: 0.85) in ${l.bright} polished
-part tower  = collar(inner: 3.15, wall: 1.45, length: 7.0, belly: 0.05) in ${l.metal} satin
+part shaft  = stem(path: through((0,0,0), (0,0,4.4)), radius: 2.95, tip: 0.88, sections: 12, sides: 22) in ${l.metal} satin
+part rim    = band(radius: 4.55, width: 1.7, thickness: 0.85, segments: 26) in ${l.bright} polished
+part tower  = collar(inner: 3.15, wall: 1.45, length: 7.0, belly: 0.05, segments: 26) in ${l.metal} satin
 part merlon = bar(length: 2.5, width: 2.3, thickness: 2.5, bevel: 0.25) in ${l.bright} polished
 
 form rook {
@@ -150,10 +150,10 @@ form rook {
 # muzzle. The mane is a second, thinner slab standing behind that curve, and
 # the ears sit at the poll where neck and head meet. He faces +y, and black's
 # knights are turned about so the two armies look at each other.
-part plinth = stem(path: through((0,0,0), (0,0,3.6)), radius: 3.2, tip: 0.86) in ${l.metal} satin
-part horse  = blade(path: through((0,-0.9,0), (0,-1.6,4.8), (0,-1.4,9.0), (0,0.3,12.2), (0,2.8,13.0), (0,4.7,12.4)), width: 6.2, thickness: 5.2, sections: 48) in ${l.metal} satin
-part mane   = blade(path: through((0,-3.6,3.4), (0,-4.2,8.4), (0,-2.6,12.4), (0,0.0,14.4)), width: 1.5, thickness: 2.0, sections: 26) in ${l.bright} polished
-part ear    = bud(length: 2.3, width: 1.3, lobes: 1, point: 0.82) in ${l.bright} polished
+part plinth = stem(path: through((0,0,0), (0,0,3.6)), radius: 3.2, tip: 0.86, sections: 10, sides: 22) in ${l.metal} satin
+part horse  = blade(path: through((0,-0.9,0), (0,-1.6,4.8), (0,-1.4,9.0), (0,0.3,12.2), (0,2.8,13.0), (0,4.7,12.4)), width: 6.2, thickness: 5.2, sections: 30, sides: 16) in ${l.metal} satin
+part mane   = blade(path: through((0,-3.6,3.4), (0,-4.2,8.4), (0,-2.6,12.4), (0,0.0,14.4)), width: 1.5, thickness: 2.0, sections: 18, sides: 10) in ${l.bright} polished
+part ear    = bud(length: 2.3, width: 1.3, lobes: 1, point: 0.82, rows: 6, segments: 12) in ${l.bright} polished
 
 form knight {
   place base
@@ -165,10 +165,10 @@ form knight {
 }`,
 
   b: (l) => base(l, 7.8, 3.0) + `
-part shaft = stem(path: through((0,0,0), (0,0,8.6)), radius: 2.5, tip: 0.52, swell: 0.34, nodes: 2) in ${l.metal} satin
-part neck  = band(radius: 1.75, width: 1.3, thickness: 0.55) in ${l.bright} polished
-part mitre = bud(length: 8.4, width: 6.6, lobes: 2, lobeDepth: 0.22, point: 0.5) in ${l.metal} satin
-part pip   = pearl(radius: 1.3) in ${l.bright} polished
+part shaft = stem(path: through((0,0,0), (0,0,8.6)), radius: 2.5, tip: 0.52, swell: 0.34, nodes: 2, sections: 24, sides: 20) in ${l.metal} satin
+part neck  = band(radius: 1.75, width: 1.3, thickness: 0.55, segments: 20) in ${l.bright} polished
+part mitre = bud(length: 8.4, width: 6.6, lobes: 2, lobeDepth: 0.22, point: 0.5, rows: 14, segments: 28) in ${l.metal} satin
+part pip   = pearl(radius: 1.3, segments: 14) in ${l.bright} polished
 
 form bishop {
   place base
@@ -179,11 +179,11 @@ form bishop {
 }`,
 
   q: (l) => base(l, 8.4, 3.2) + `
-part shaft = stem(path: through((0,0,0), (0,0,12.8)), radius: 2.7, tip: 0.48, swell: 0.36, nodes: 2) in ${l.metal} satin
-part neck  = band(radius: 1.85, width: 1.4, thickness: 0.6) in ${l.bright} polished
-part crown = bell(length: 4.8, mouth: 9.8, throat: 4.6, wall: 0.95, flare: 1.15) in ${l.metal} satin
-part point = bead(radius: 0.85, point: 1.1) in ${l.bright} polished
-part orb   = pearl(radius: 1.65) in ${l.bright} polished
+part shaft = stem(path: through((0,0,0), (0,0,12.8)), radius: 2.7, tip: 0.48, swell: 0.36, nodes: 2, sections: 28, sides: 20) in ${l.metal} satin
+part neck  = band(radius: 1.85, width: 1.4, thickness: 0.6, segments: 20) in ${l.bright} polished
+part crown = bell(length: 4.8, mouth: 9.8, throat: 4.6, wall: 0.95, flare: 1.15, rows: 8, segments: 30) in ${l.metal} satin
+part point = bead(radius: 0.85, point: 1.1, segments: 10) in ${l.bright} polished
+part orb   = pearl(radius: 1.65, segments: 16) in ${l.bright} polished
 
 form queen {
   place base
@@ -195,10 +195,10 @@ form queen {
 }`,
 
   k: (l) => base(l, 8.4, 3.2) + `
-part shaft    = stem(path: through((0,0,0), (0,0,13.4)), radius: 2.7, tip: 0.48, swell: 0.36, nodes: 2) in ${l.metal} satin
-part neck     = band(radius: 1.85, width: 1.4, thickness: 0.6) in ${l.bright} polished
-part crown    = bell(length: 4.4, mouth: 9.4, throat: 4.8, wall: 0.95, flare: 1.1) in ${l.metal} satin
-part point    = bead(radius: 0.8, point: 0.95) in ${l.bright} polished
+part shaft    = stem(path: through((0,0,0), (0,0,13.4)), radius: 2.7, tip: 0.48, swell: 0.36, nodes: 2, sections: 28, sides: 20) in ${l.metal} satin
+part neck     = band(radius: 1.85, width: 1.4, thickness: 0.6, segments: 20) in ${l.bright} polished
+part crown    = bell(length: 4.4, mouth: 9.4, throat: 4.8, wall: 0.95, flare: 1.1, rows: 8, segments: 30) in ${l.metal} satin
+part point    = bead(radius: 0.8, point: 0.95, segments: 10) in ${l.bright} polished
 part upright  = bar(length: 4.4, width: 1.45, thickness: 1.45, bevel: 0.3) in ${l.bright} polished
 part crossarm = bar(length: 2.9, width: 1.45, thickness: 1.45, bevel: 0.3) in ${l.bright} polished
 
@@ -226,9 +226,9 @@ export function pieceSketch(colour: 'w' | 'b', type: string): string {
  */
 export const MARKERS = `material gold polished
 
-part quiet   = plate(roundel(radius: 4.4), thickness: 0.5, bevel: 0.2, enamel: emerald) in gold polished
-part capture = plate(roundel(radius: 10), thickness: 0.5, bevel: 0.2, enamel: coral) in gold polished
-part chosen  = plate(roundel(radius: 9.6), thickness: 0.5, bevel: 0.2, enamel: amber) in gold polished
+part quiet   = plate(roundel(radius: 4.4, segments: 26), thickness: 0.5, bevel: 0.2, enamel: emerald) in gold polished
+part capture = plate(roundel(radius: 10, segments: 32), thickness: 0.5, bevel: 0.2, enamel: coral) in gold polished
+part chosen  = plate(roundel(radius: 9.6, segments: 32), thickness: 0.5, bevel: 0.2, enamel: amber) in gold polished
 part last    = plate(polygon(sides: 4, radius: 14.2, rotate: 45deg), thickness: 0.4, bevel: 0.2, enamel: peacock) in gold polished
 
 # The last move is marked by tinting the whole square rather than by a disc on

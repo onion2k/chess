@@ -36,8 +36,19 @@ stays readable:
    `move` calls re-measured the whole scene a dozen times for every
    movement of the pointer: 15 ms a pointermove became 1.3 ms.
 
-Worth sending back to artshape: `moveAll` is a plain win for anything
-whose subject is made of parts that move together.
+5. **A per-group draw count was added.** `InstanceGroup` takes an optional
+   `count`: how many of its placements to draw, from the first. A program
+   that keeps a pool of instances — room for every man a chess set could
+   have, of which a third are ever on the board — now allocates the pool
+   once and draws only the live end of it. Every pass honours it (the
+   scene, the prepass, both shadow bakes, the cushion, the probe, the
+   contact depth), as do `pick` and the scene's bounds. `move` and
+   `moveAll` take a new count alongside the matrices, so a move can change
+   how many are drawn in the same call. Here it took the geometry submitted
+   each frame from 1.31M triangles to 186k.
+
+Worth sending back to artshape: `moveAll` and `count` are both plain wins
+for anything whose subject is a pool of parts that move together.
 
 ## A fix sent back
 

@@ -94,10 +94,22 @@ export function turned(angle: number, x: number, y: number, z: number): Mat4 {
   return new Float32Array([c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, x, y, z, 1]);
 }
 
+/** A group's placements and how many of them are standing, for the renderer. */
+export interface Placed {
+  group: number;
+  matrices: Float32Array;
+  count: number;
+}
+
 /**
  * Builds every group once. The board's groups come first and never move; then
  * the twelve kinds of man, each dynamic so that moving one does not begin the
  * sky occlusion bake again; then the markers.
+ *
+ * Every kind is allocated at the most of that man the rules allow, but only
+ * the men actually standing are drawn: the pool is three times what a game
+ * uses, and drawing all of it costs a million triangles a frame for the third
+ * that can be seen.
  */
 export class SetScene {
   readonly groups: InstanceGroup[] = [];
@@ -117,7 +129,7 @@ export class SetScene {
         for (const group of groups) {
           const locals = split(group.matrices);
           slices.push({ group: this.groups.length, locals });
-          this.push({ ...group, dynamic: true, matrices: blank(locals.length * capacity) }, colour);
+          this.push({ ...group, dynamic: true, count: 0, matrices: blank(locals.length * capacity) }, colour);
         }
         this.kinds.set(colour + type, {
           slices, capacity,
@@ -137,7 +149,7 @@ export class SetScene {
       if (!group) throw new Error(`markers: no part enamelled ${MARKER_ENAMEL[kind]} for ${kind}`);
       const locals = split(group.matrices);
       this.markers.set(kind, { slices: [{ group: this.groups.length, locals }], capacity });
-      this.push({ ...group, dynamic: true, matrices: blank(capacity * locals.length) }, 'marker');
+      this.push({ ...group, dynamic: true, count: 0, matrices: blank(capacity * locals.length) }, 'marker');
     }
   }
 
@@ -198,14 +210,17 @@ export class SetScene {
     // the board moves his own eight or so meshes, and telling the renderer
     // about the other ninety would have it re-measure the whole scene ninety
     // times for one movement of the pointer
-    const touched: number[] = [];
-    for (const kind of this.kinds.values()) {
+    const touched: Placed[] = [];
+    for (const [key, kind] of this.kinds) {
+      const standing = used.get(key) ?? 0;
       for (const slice of kind.slices) {
-        const target = this.groups[slice.group].matrices;
-        const buffer = buffers.get(slice.group) ?? blank(target.length / 16);
-        if (same(target, buffer)) continue;
-        target.set(buffer);
-        touched.push(slice.group);
+        const group = this.groups[slice.group];
+        const buffer = buffers.get(slice.group) ?? blank(group.matrices.length / 16);
+        const count = standing * slice.locals.length;
+        if (count === group.count && same(group.matrices, buffer)) continue;
+        group.matrices.set(buffer);
+        group.count = count;
+        touched.push({ group: slice.group, matrices: group.matrices, count });
       }
     }
     return touched;
@@ -219,10 +234,10 @@ export class SetScene {
 
   /**
    * Lay markers of one kind on these points; anything beyond the group's
-   * capacity is dropped. Returns the group to write back, or -1 when the
+   * capacity is dropped. Returns the group to write back, or null when the
    * markers are already where they are wanted.
    */
-  mark(kind: MarkerKind, points: Array<[number, number, number]>): number {
+  mark(kind: MarkerKind, points: Array<[number, number, number]>): Placed | null {
     const entry = this.markers.get(kind)!;
     const slice = entry.slices[0];
     const buffer = blank(entry.capacity * slice.locals.length);
@@ -231,10 +246,12 @@ export class SetScene {
         buffer.set(multiply(translation(p), local), (i * slice.locals.length + l) * 16);
       });
     });
-    const target = this.groups[slice.group].matrices;
-    if (same(target, buffer)) return -1;
-    target.set(buffer);
-    return slice.group;
+    const group = this.groups[slice.group];
+    const count = Math.min(points.length, entry.capacity) * slice.locals.length;
+    if (count === group.count && same(group.matrices, buffer)) return null;
+    group.matrices.set(buffer);
+    group.count = count;
+    return { group: slice.group, matrices: group.matrices, count };
   }
 }
 

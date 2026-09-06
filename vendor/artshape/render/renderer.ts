@@ -96,6 +96,14 @@ export interface InstanceGroup {
    * shadow and the cushion still follow it — so `move` on it restarts no bake.
    */
   dynamic?: boolean;
+  /**
+   * How many of the placements to draw, from the first. A program that keeps
+   * a pool of instances — room for every man a chess set could have, of which
+   * a third are ever on the board — allocates the pool once and draws only
+   * the live end of it, rather than paying for the rest every frame. Left out,
+   * every placement is drawn.
+   */
+  count?: number;
 }
 
 /** A mesh's vertex buffers, shared by every group that draws the mesh. */
@@ -124,8 +132,17 @@ interface GpuGroup {
   selected: GPUBuffer;
   index: GPUBuffer;
   indexCount: number;
+  /** Placements the group has room for. */
   instanceCount: number;
+  /** Placements actually drawn, from the first: `instanceCount` unless the source says fewer. */
+  drawCount: number;
   vertexCount: number;
+}
+
+/** Placements a group draws: what it says, clamped to what it has room for. */
+function liveCount(g: InstanceGroup): number {
+  const room = g.matrices.length / 16;
+  return g.count === undefined ? room : Math.max(0, Math.min(room, Math.floor(g.count)));
 }
 
 /** Enamel and cap flags, interleaved as one vec2 per vertex. */
@@ -944,6 +961,7 @@ export class Renderer {
         selected: emptyBuffer(device, (g.matrices.length / 16) * 4, GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST, 'selected'),
         indexCount: g.mesh.indices.length,
         instanceCount: g.matrices.length / 16,
+        drawCount: liveCount(g),
         vertexCount: g.mesh.positions.length / 3,
       };
     });
@@ -987,8 +1005,8 @@ export class Renderer {
    * and the sky occlusion is baked again only for a static group;
    * a dynamic one moves under the bake that stands.
    */
-  move(group: number, matrices: Float32Array) {
-    this.moveAll([{ group, matrices }]);
+  move(group: number, matrices: Float32Array, count?: number) {
+    this.moveAll([{ group, matrices, count }]);
   }
 
   /**
@@ -998,14 +1016,18 @@ export class Renderer {
    * dragged: a dozen separate `move` calls would re-measure the whole scene a
    * dozen times for one movement of the pointer.
    */
-  moveAll(updates: Array<{ group: number; matrices: Float32Array }>) {
+  moveAll(updates: Array<{ group: number; matrices: Float32Array; count?: number }>) {
     if (!updates.length) return;
     let bake = false;
-    for (const { group, matrices } of updates) {
+    for (const { group, matrices, count } of updates) {
       const g = this.groups[group];
       if (!g) throw new Error(`move: no group ${group}`);
       if (matrices.length !== g.instanceCount * 16) throw new Error(`move: group ${group} has ${g.instanceCount} placements, not ${matrices.length / 16}`);
       g.source.matrices.set(matrices);
+      if (count !== undefined) {
+        g.source.count = count;
+        g.drawCount = liveCount(g.source);
+      }
       this.ctx.device.queue.writeBuffer(g.instance, 0, g.source.matrices as Float32Array<ArrayBuffer>);
       if (!g.source.dynamic) bake = true;
     }
@@ -1032,7 +1054,8 @@ export class Renderer {
     const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
     for (const g of groups) {
       const b = boundsOf(g.mesh);
-      for (let i = 0; i < g.matrices.length; i += 16) {
+      const live = liveCount(g) * 16;
+      for (let i = 0; i < live; i += 16) {
         const m = g.matrices.subarray(i, i + 16);
         for (let c = 0; c < 8; c++) {
           const p = transformPoint(m, [c & 1 ? b.max[0] : b.min[0], c & 2 ? b.max[1] : b.min[1], c & 4 ? b.max[2] : b.min[2]]);
@@ -1097,7 +1120,7 @@ export class Renderer {
     this.groups.forEach((g, k) => {
       const mesh = g.source.mesh;
       const box = boundsOf(mesh);
-      for (let i = 0; i < g.instanceCount; i++) {
+      for (let i = 0; i < g.drawCount; i++) {
         const m = g.source.matrices.subarray(i * 16, i * 16 + 16);
         const local = invert(m);
         if (!local) continue;
@@ -1336,7 +1359,7 @@ export class Renderer {
         shadowPass.setVertexBuffer(0, g.position);
         shadowPass.setVertexBuffer(1, g.instance);
         shadowPass.setIndexBuffer(g.index, 'uint32');
-        shadowPass.drawIndexed(g.indexCount, g.instanceCount);
+        shadowPass.drawIndexed(g.indexCount, g.drawCount);
       }
       shadowPass.end();
       // and the rig's, one layer each, the same way
@@ -1355,7 +1378,7 @@ export class Renderer {
           pass.setVertexBuffer(0, g.position);
           pass.setVertexBuffer(1, g.instance);
           pass.setIndexBuffer(g.index, 'uint32');
-          pass.drawIndexed(g.indexCount, g.instanceCount);
+          pass.drawIndexed(g.indexCount, g.drawCount);
         }
         pass.end();
       });
@@ -1386,7 +1409,7 @@ export class Renderer {
         downPass.setVertexBuffer(0, g.position);
         downPass.setVertexBuffer(1, g.instance);
         downPass.setIndexBuffer(g.index, 'uint32');
-        downPass.drawIndexed(g.indexCount, g.instanceCount);
+        downPass.drawIndexed(g.indexCount, g.drawCount);
       }
       downPass.end();
       this.cushion.bake(encoder, this.cushionDepthView, this.occlusion.groundCentre, this.occlusion.groundRadius, { ...cushionShape, puff: this.mm(cushionShape.puff) }, this.mmPerUnit);
@@ -1417,7 +1440,7 @@ export class Renderer {
         dp.setVertexBuffer(0, g.position);
         dp.setVertexBuffer(1, g.instance);
         dp.setIndexBuffer(g.index, 'uint32');
-        dp.drawIndexed(g.indexCount, g.instanceCount);
+        dp.drawIndexed(g.indexCount, g.drawCount);
       }
       if (this.occlusion && this.groundBind) {
         dp.setPipeline(this.groundDepthPipeline);
@@ -1439,7 +1462,7 @@ export class Renderer {
         pass.setVertexBuffer(0, g.position);
         pass.setVertexBuffer(1, g.instance);
         pass.setIndexBuffer(g.index, 'uint32');
-        pass.drawIndexed(g.indexCount, g.instanceCount);
+        pass.drawIndexed(g.indexCount, g.drawCount);
       }
     }
 
@@ -1464,7 +1487,7 @@ export class Renderer {
         pass.setVertexBuffer(7, g.engrave);
         pass.setVertexBuffer(6, g.selected);
         pass.setIndexBuffer(g.index, 'uint32');
-        pass.drawIndexed(g.indexCount, g.instanceCount);
+        pass.drawIndexed(g.indexCount, g.drawCount);
       });
     }
 
@@ -1739,7 +1762,7 @@ export class Renderer {
         pass.setVertexBuffer(0, g.position);
         pass.setVertexBuffer(1, g.instance);
         pass.setIndexBuffer(g.index, 'uint32');
-        pass.drawIndexed(g.indexCount, g.instanceCount);
+        pass.drawIndexed(g.indexCount, g.drawCount);
       }
       if (this.groundBind) {
         pass.setPipeline(this.groundProbePipeline);
@@ -1761,7 +1784,7 @@ export class Renderer {
           pass.setVertexBuffer(6, g.selected);
           pass.setVertexBuffer(7, g.engrave);
           pass.setIndexBuffer(g.index, 'uint32');
-          pass.drawIndexed(g.indexCount, g.instanceCount);
+          pass.drawIndexed(g.indexCount, g.drawCount);
         });
       }
       pass.end();
@@ -1845,7 +1868,7 @@ export class Renderer {
           pass.setVertexBuffer(0, g.position);
           pass.setVertexBuffer(1, g.instance);
           pass.setIndexBuffer(g.index, 'uint32');
-          pass.drawIndexed(g.indexCount, g.instanceCount);
+          pass.drawIndexed(g.indexCount, g.drawCount);
         });
         pass.end();
       });

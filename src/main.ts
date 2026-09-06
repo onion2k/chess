@@ -187,11 +187,11 @@ function movesFrom(sq: number | null): Move[] {
 }
 
 function markSquares(kind: MarkerKind, squares: number[], lift: number) {
-  const group = scene.mark(kind, squares.map((sq) => {
+  const placed = scene.mark(kind, squares.map((sq) => {
     const [x, y] = squareCentre(sq);
     return [x, y, TOP + lift] as [number, number, number];
   }));
-  if (group >= 0) viewer.move(group, scene.groups[group].matrices);
+  if (placed) viewer.move(placed.group, placed.matrices, placed.count);
 }
 
 /**
@@ -200,7 +200,7 @@ function markSquares(kind: MarkerKind, squares: number[], lift: number) {
  * changing while he does.
  */
 function refresh(silent = false) {
-  viewer.moveAll(scene.place(standing()).map((group) => ({ group, matrices: scene.groups[group].matrices })));
+  viewer.moveAll(scene.place(standing()));
 
   const options = movesFrom(chosen);
   markSquares('last', lastMove ? [lastMove.from, lastMove.to] : [], 0.25);
