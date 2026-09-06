@@ -5,6 +5,8 @@ silver and six in gold, standing on an art deco board on a walnut table,
 drawn by artshape — the renderer, vendored, with no editor and no
 controls.
 
+Played at **https://onion2k.github.io/chess/**, or run it yourself:
+
     npm install
     npm run dev
 
@@ -115,3 +117,19 @@ What the tests cannot see is the picture, which was checked in the
 browser: the set stands and is lit, a man lifts and lands, the markers
 fall on the right squares, the promotion is asked for, a takeback undoes
 both plies, and the board turns round when you play black.
+
+## Deploying
+
+Every push to `main` builds the game and puts it on GitHub Pages, by the
+workflow in `.github/workflows/pages.yml`. The tests run first and the
+build typechecks, so a push that breaks either never reaches the page.
+Nothing in CI needs a GPU: the node suite covers the rules, the engine
+and the scene, and the renderer is only exercised in a browser.
+
+The built game is served from a project page, so `vite.config.ts` sets
+`base` to `/chess/` for a build and leaves the dev server at the root.
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). That covers the vendored copy of artshape
+under `vendor/` as well as the game itself.
