@@ -1,9 +1,9 @@
 # Chess
 
-A game of chess played on a precious-metals set: six men in silver and
-six in gold, enamelled and stone-set, standing on an art deco board on a
-walnut table, drawn by artshape — the renderer, vendored, with no editor
-and no controls.
+A game of chess played on a precious-metals set: Staunton men, six in
+silver and six in gold, standing on an art deco board on a walnut table,
+drawn by artshape — the renderer, vendored, with no editor and no
+controls.
 
     npm install
     npm run dev
@@ -66,6 +66,22 @@ The search runs in a worker, so the board stays turnable while it thinks.
     src/ray.ts     a point on the canvas into a ray in the board's millimetres
     src/main.ts    the page: the look, the pointer, the panel
     vendor/        artshape, copied — see vendor/artshape/README.md
+
+## The set
+
+The men are Staunton: a stepped base under a hollow flare, a turned
+baluster, and then the head that says what the man is — a ball for the
+pawn, a battlement for the rook, a horse for the knight, a slit mitre for
+the bishop, a coronet of points for the queen, a crown under a cross for
+the king. They stand in the traditional order, the king half again as
+tall as a square is wide and the rest stepped down from him, which a test
+holds them to. The horse is cut the way a carver cuts one: a flat slab in
+the piece's own plane, bent up the neck, over the poll and down the face.
+
+Nothing on a man is enamelled or stone-set. The two armies are told apart
+by their metal, as a boxwood set is told apart by its stain — which is
+also what lets **Randomise** recast the whole man rather than part of him.
+The board keeps its enamel squares and its onyx corners.
 
 The board is in millimetres, as artshape's own sketches are: squares are
 22 apart, their tops 6.8 above the table, a1 at (-77, -77).

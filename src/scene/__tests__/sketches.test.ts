@@ -16,6 +16,19 @@ describe('sketches', () => {
     expect(sketch!.assembly.placements.length).toBe(4);
   });
 
+  it('stands the men in the order a Staunton set stands them', () => {
+    const height = (type: string) => compile(pieceSketch('w', type)).sketch!.assembly.bounds().max[2];
+    const [pawn, rook, knight, bishop, queen, king] =
+      ['p', 'r', 'n', 'b', 'q', 'k'].map(height);
+    // king over queen over bishop over knight over rook over pawn, which is
+    // what tells one man from another across a board before its shape does
+    expect([pawn, rook, knight, bishop, queen, king])
+      .toEqual([...[pawn, rook, knight, bishop, queen, king]].sort((a, b) => a - b));
+    // and the king half again as tall as a square is wide, as a made set is
+    expect(king / 22).toBeGreaterThan(1.2);
+    expect(king / 22).toBeLessThan(1.6);
+  });
+
   it('compiles every man of both armies, standing on the origin', () => {
     for (const colour of ['w', 'b'] as const) {
       for (const type of PIECE_TYPES) {

@@ -57,132 +57,154 @@ form chessboard {
   repeat collet around ring(4, radius: 122, phase: 45deg, z: 5.6)
 }`;
 
-/** What separates one army from the other: the metal, and what is set in it. */
+/** What separates one army from the other. */
 interface Livery {
   metal: string;
-  /** Enamel of the roundel let into the foot. */
-  inlay: string;
-  /** Nacre of the pearls: the pawn's head, the bishop's pip, the queen's. */
-  pearl: string;
-  /** The stone in every collet. */
-  stone: string;
+  /** Polished for the turned collars and the base's steps, satin for the rest. */
+  bright: string;
 }
 
 export const LIVERY: Record<'w' | 'b', Livery> = {
-  w: { metal: 'silver', inlay: 'cobalt', pearl: 'white pearl', stone: 'sapphire' },
-  b: { metal: 'gold', inlay: 'ruby', pearl: 'gold pearl', stone: 'ruby' },
+  w: { metal: 'silver', bright: 'silver' },
+  b: { metal: 'gold', bright: 'gold' },
 };
 
-/** The base, the hoop and the collet, which every man is built on. */
-const common = (l: Livery) => `material ${l.metal} satin
+/**
+ * The base every man stands on, and the turned foot rising out of it.
+ *
+ * A Staunton base is a broad disc, stepped at its edge, with a hollow flare
+ * sweeping up from it to the collar the stem begins at. `radius` is the
+ * disc's, `rise` how far the flare climbs; a king stands on a wider foot than
+ * a pawn and the rest of him is scaled to it.
+ *
+ * The plate is centred on its own z, so it is placed at half its thickness to
+ * stand on the square. The flare is a bell with its wide end at the bottom.
+ */
+const base = (l: Livery, radius: number, rise: number) => `material ${l.metal} satin
 
-part foot  = disc(radius: 7.2, thickness: 2.4, bevel: 0.7) in ${l.metal} polished
-part inlay = plate(roundel(radius: 5.9), thickness: 1, bevel: 0.3, enamel: ${l.inlay}) in ${l.metal} satin
-part hoop  = band(radius: 2, width: 1.6, thickness: 0.9) in ${l.metal} polished
-part seat  = setting(width: 3, style: bezel, height: 1.2) in ${l.metal} polished
-part stone = gem(cut: brilliant, width: 3) in ${l.stone}
+part foot  = plate(roundel(radius: ${radius}), thickness: 1.15, tiers: 2, shrink: 0.075, bevel: 0.4) in ${l.bright} polished
+part flare = bell(length: ${rise}, mouth: ${(radius * 0.5).toFixed(2)}, throat: ${(radius * 1.92).toFixed(2)}, wall: 1.0, flare: 1.2) in ${l.metal} satin
+part ring  = band(radius: ${(radius * 0.31).toFixed(2)}, width: 1.3, thickness: 0.55) in ${l.bright} polished
 
-unit collet {
-  place seat
-  fasten stone to seat.seat
-}
 unit base {
-  place foot at (0, 0, 1.2)
-  place inlay at (0, 0, 2.9)
+  place foot at (0, 0, 1.15)
+  place flare at (0, 0, 2.3)
+  place ring at (0, 0, ${(2.3 + rise).toFixed(2)})
 }
 `;
 
-/** The hatching every shaft and cup carries. */
-const HATCH = 'engraved hatch(scale: 1.3, depth: 0.13)';
-const HATCH_ACROSS = 'engraved hatch(scale: 1.3, depth: 0.13, angle: 90deg)';
-
+/**
+ * The six men, in the shapes a Staunton set has had since 1849: a turned
+ * baluster stem on a stepped base for all of them, and then the head that
+ * tells you what the man is — a ball for the pawn, a battlement for the rook,
+ * a horse for the knight, a slit mitre for the bishop, a coronet of points
+ * for the queen and a crown under a cross for the king.
+ *
+ * Heights are the traditional proportions against a 22 mm square: the king
+ * half again as tall as the square is wide, and the rest stepped down from
+ * him. Nothing is enamelled and nothing is set: the two armies are told apart
+ * by their metal, as a boxwood set is told apart by its stain.
+ */
 const bodies: Record<string, (l: Livery) => string> = {
-  p: (l) => `part shaft = stem(path: through((0,0,0), (0,0,9)), radius: 2.6, tip: 0.45, swell: 0.3) in ${l.metal} satin ${HATCH}
-part head = pearl(radius: 3) in ${l.pearl}
+  p: (l) => base(l, 7.0, 2.9) + `
+part shaft = stem(path: through((0,0,0), (0,0,6.6)), radius: 2.35, tip: 0.6, swell: 0.24) in ${l.metal} satin
+part neck  = band(radius: 1.5, width: 1.0, thickness: 0.5) in ${l.bright} polished
+part head  = pearl(radius: 2.5) in ${l.bright} polished
 
 form pawn {
   place base
-  place shaft at (0, 0, 3.4)
-  place hoop at (0, 0, 12.6)
-  place head at (0, 0, 15.8)
+  place shaft at (0, 0, 5.4)
+  place neck at (0, 0, 12.1)
+  place head at (0, 0, 13.9)
 }`,
 
-  r: (l) => `part shaft  = stem(path: through((0,0,0), (0,0,7)), radius: 3, tip: 0.8, swell: 0.25) in ${l.metal} satin ${HATCH}
-part tower  = collar(inner: 2.6, wall: 2.1, length: 7, belly: 0.05) in ${l.metal} satin ${HATCH_ACROSS}
-part rim    = band(radius: 4.8, width: 1.5, thickness: 1) in ${l.metal} polished
-part lid    = disc(radius: 4.9, thickness: 1, bevel: 0.3) in ${l.metal} polished
-part merlon = bar(length: 2.2, width: 2.6, thickness: 2.4, bevel: 0.3) in ${l.metal} polished
+  r: (l) => base(l, 7.8, 3.0) + `
+part shaft  = stem(path: through((0,0,0), (0,0,4.4)), radius: 2.95, tip: 0.88) in ${l.metal} satin
+part rim    = band(radius: 4.55, width: 1.7, thickness: 0.85) in ${l.bright} polished
+part tower  = collar(inner: 3.15, wall: 1.45, length: 7.0, belly: 0.05) in ${l.metal} satin
+part merlon = bar(length: 2.5, width: 2.3, thickness: 2.5, bevel: 0.25) in ${l.bright} polished
 
 form rook {
   place base
-  place shaft at (0, 0, 3.4)
-  place hoop at (0, 0, 10.6)
-  place rim at (0, 0, 11.4)
-  place tower at (0, 0, 14.6)
-  place lid at (0, 0, 17.6)
-  repeat merlon around ring(4, radius: 3.5, z: 19.3)
+  place shaft at (0, 0, 5.5)
+  place rim at (0, 0, 10.2)
+  place tower at (0, 0, 14.0)
+  repeat merlon around ring(4, radius: 3.6, z: 18.0)
 }`,
 
-  n: (l) => `part shaft = stem(path: through((0,0,0), (0,0,7)), radius: 3, tip: 0.8, swell: 0.25) in ${l.metal} satin ${HATCH}
-part crest = blade(path: through((0,0,0), (0,0,5), (0,1.5,9), (0,4,11.5), (0,6.5,11)), width: 6.5, thickness: 2.4, sections: 40) in ${l.metal} satin
-part ear   = plate(lozenge(length: 3.4, width: 1.5), thickness: 1.1, bevel: 0.25) in ${l.metal} polished
+  n: (l) => base(l, 7.8, 2.8) + `
+# The horse is cut the way a carver cuts one: a flat slab in the piece's own
+# plane, bent up the neck, over the poll and down the face, so its outer edge
+# is the crest and its inner edge the throat and jaw, and its blunt end the
+# muzzle. The mane is a second, thinner slab standing behind that curve, and
+# the ears sit at the poll where neck and head meet. He faces +y, and black's
+# knights are turned about so the two armies look at each other.
+part plinth = stem(path: through((0,0,0), (0,0,3.6)), radius: 3.2, tip: 0.86) in ${l.metal} satin
+part horse  = blade(path: through((0,-0.9,0), (0,-1.6,4.8), (0,-1.4,9.0), (0,0.3,12.2), (0,2.8,13.0), (0,4.7,12.4)), width: 6.2, thickness: 5.2, sections: 48) in ${l.metal} satin
+part mane   = blade(path: through((0,-3.6,3.4), (0,-4.2,8.4), (0,-2.6,12.4), (0,0.0,14.4)), width: 1.5, thickness: 2.0, sections: 26) in ${l.bright} polished
+part ear    = bud(length: 2.3, width: 1.3, lobes: 1, point: 0.82) in ${l.bright} polished
 
 form knight {
   place base
-  place shaft at (0, 0, 3.4)
-  place hoop at (0, 0, 10.6)
-  place crest at (0, 0, 11)
-  place ear at (1.2, 0, 23.4) roll 90deg pitch -25deg
-  place collet at (2.4, 1.3, 21.6) pitch 90deg roll 20deg
-  place collet at (2.4, -1.3, 21.6) pitch 90deg roll -20deg
+  place plinth at (0, 0, 5.1)
+  place horse at (0, 0, 6.9)
+  place mane at (0, 0, 6.9)
+  place ear at (1.4, -0.7, 19.4) pitch -16deg
+  place ear at (-1.4, -0.7, 19.4) pitch -16deg
 }`,
 
-  b: (l) => `part shaft = stem(path: through((0,0,0), (0,0,9)), radius: 2.8, tip: 0.5, swell: 0.3) in ${l.metal} satin ${HATCH}
-part mitre = bud(length: 10.5, width: 7, lobes: 2, lobeDepth: 0.18, point: 0.5) in ${l.metal} satin
-part pip   = pearl(radius: 1.6) in ${l.pearl}
+  b: (l) => base(l, 7.8, 3.0) + `
+part shaft = stem(path: through((0,0,0), (0,0,8.6)), radius: 2.5, tip: 0.52, swell: 0.34, nodes: 2) in ${l.metal} satin
+part neck  = band(radius: 1.75, width: 1.3, thickness: 0.55) in ${l.bright} polished
+part mitre = bud(length: 8.4, width: 6.6, lobes: 2, lobeDepth: 0.22, point: 0.5) in ${l.metal} satin
+part pip   = pearl(radius: 1.3) in ${l.bright} polished
 
 form bishop {
   place base
-  place shaft at (0, 0, 3.4)
-  place hoop at (0, 0, 12.6)
-  place mitre at (0, 0, 13)
-  place pip at (0, 0, 24.2)
-  place collet at (0, -3.1, 17.4) roll -90deg
+  place shaft at (0, 0, 5.5)
+  place neck at (0, 0, 13.8)
+  place mitre at (0, 0, 14.2)
+  place pip at (0, 0, 23.3)
 }`,
 
-  q: (l) => `part shaft = stem(path: through((0,0,0), (0,0,13.5)), radius: 2.8, tip: 0.55, swell: 0.3) in ${l.metal} satin ${HATCH}
-part cup   = bell(length: 6.5, mouth: 10, throat: 6.4, wall: 1.3, flare: 1.2) in ${l.metal} satin ${HATCH_ACROSS}
-part pip   = pearl(radius: 2.5) in ${l.pearl}
+  q: (l) => base(l, 8.4, 3.2) + `
+part shaft = stem(path: through((0,0,0), (0,0,12.8)), radius: 2.7, tip: 0.48, swell: 0.36, nodes: 2) in ${l.metal} satin
+part neck  = band(radius: 1.85, width: 1.4, thickness: 0.6) in ${l.bright} polished
+part crown = bell(length: 4.8, mouth: 9.8, throat: 4.6, wall: 0.95, flare: 1.15) in ${l.metal} satin
+part point = bead(radius: 0.85, point: 1.1) in ${l.bright} polished
+part orb   = pearl(radius: 1.65) in ${l.bright} polished
 
 form queen {
   place base
-  place shaft at (0, 0, 3.4)
-  place hoop at (0, 0, 17)
-  place cup at (0, 0, 17.2)
-  repeat collet around ring(8, radius: 4.6, z: 23.6, tilt: 40deg)
-  place pip at (0, 0, 25.6)
+  place shaft at (0, 0, 5.7)
+  place neck at (0, 0, 18.1)
+  place crown at (0, 0, 18.4)
+  repeat point around ring(9, radius: 4.5, z: 23.8)
+  place orb at (0, 0, 25.0)
 }`,
 
-  k: (l) => `part shaft    = stem(path: through((0,0,0), (0,0,15.5)), radius: 2.8, tip: 0.55, swell: 0.3) in ${l.metal} satin ${HATCH}
-part cup      = bell(length: 5, mouth: 9.5, throat: 6.2, wall: 1.3, flare: 1.2) in ${l.metal} satin ${HATCH_ACROSS}
-part upright  = bar(length: 7, width: 2.2, thickness: 2.2, bevel: 0.35) in ${l.metal} polished
-part crossarm = bar(length: 4.4, width: 2.2, thickness: 2.2, bevel: 0.35) in ${l.metal} polished
+  k: (l) => base(l, 8.4, 3.2) + `
+part shaft    = stem(path: through((0,0,0), (0,0,13.4)), radius: 2.7, tip: 0.48, swell: 0.36, nodes: 2) in ${l.metal} satin
+part neck     = band(radius: 1.85, width: 1.4, thickness: 0.6) in ${l.bright} polished
+part crown    = bell(length: 4.4, mouth: 9.4, throat: 4.8, wall: 0.95, flare: 1.1) in ${l.metal} satin
+part point    = bead(radius: 0.8, point: 0.95) in ${l.bright} polished
+part upright  = bar(length: 4.4, width: 1.45, thickness: 1.45, bevel: 0.3) in ${l.bright} polished
+part crossarm = bar(length: 2.9, width: 1.45, thickness: 1.45, bevel: 0.3) in ${l.bright} polished
 
 form king {
   place base
-  place shaft at (0, 0, 3.4)
-  place hoop at (0, 0, 19)
-  place cup at (0, 0, 19.2)
-  repeat collet around ring(8, radius: 4.4, z: 24.4, tilt: 40deg)
-  place upright at (0, 0, 27.5) pitch -90deg
-  place crossarm at (0, 0, 28.5)
+  place shaft at (0, 0, 5.7)
+  place neck at (0, 0, 18.7)
+  place crown at (0, 0, 19.0)
+  repeat point around ring(9, radius: 4.4, z: 24.0)
+  place upright at (0, 0, 27.0) pitch -90deg
+  place crossarm at (0, 0, 27.6)
 }`,
 };
 
 /** The sketch for one man: `type` is the usual letter, `colour` which army. */
 export function pieceSketch(colour: 'w' | 'b', type: string): string {
-  const livery = LIVERY[colour];
-  return common(livery) + '\n' + bodies[type](livery);
+  return bodies[type](LIVERY[colour]);
 }
 
 /**
