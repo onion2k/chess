@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='none' stroke='%23c9a227' stroke-width='2'/></svg>" />
+    <title>Chess</title>
+    <style>
+      :root {
+        --bg: #0b0c0e;
+        --panel: #16181c;
+        --line: #2a2e35;
+        --text: #d8dce3;
+        --dim: #838b98;
+        --accent: #c9a227;
+        --panel-width: 260px;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+        font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; }
+      #app { display: flex; height: 100%; }
+      #stage { flex: 1; position: relative; min-width: 0; touch-action: none; cursor: default; }
+      #stage.grab { cursor: grab; }
+      #stage.grabbing { cursor: grabbing; }
+      #panel { width: var(--panel-width); flex: none; border-left: 1px solid var(--line);
+        background: var(--panel); display: flex; flex-direction: column; }
+      @media (max-width: 900px) { :root { --panel-width: 210px; } }
+
+      h1 { font: 600 15px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.16em;
+        text-transform: uppercase; color: var(--accent); margin: 0; padding: 16px 14px 12px; }
+      .block { padding: 10px 14px; border-top: 1px solid var(--line); }
+      .label { color: var(--dim); text-transform: uppercase; letter-spacing: 0.1em; font-size: 10px; margin-bottom: 6px; }
+      .row { display: flex; gap: 6px; }
+      button, select { font: inherit; color: var(--text); background: #1e2127; border: 1px solid var(--line);
+        border-radius: 3px; padding: 5px 8px; cursor: pointer; }
+      button:hover:not(:disabled), select:hover { border-color: #3d434d; }
+      button:disabled { opacity: 0.4; cursor: default; }
+      button.on { border-color: var(--accent); color: var(--accent); }
+      .row button, select { flex: 1; }
+      #status { padding: 10px 14px; border-top: 1px solid var(--line); min-height: 58px; }
+      #status .who { color: var(--text); }
+      #status .note { color: var(--dim); font-size: 11px; }
+      #status.over .who { color: var(--accent); }
+      #moves { flex: 1; overflow-y: auto; border-top: 1px solid var(--line); padding: 8px 14px 24px; }
+      #moves table { width: 100%; border-collapse: collapse; }
+      #moves td { padding: 1px 0; }
+      #moves td.n { color: var(--dim); width: 2.4em; }
+      #moves td.m { width: 42%; }
+      #moves tr.latest td.m.live { color: var(--accent); }
+
+      #promotion { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+        background: rgba(11, 12, 14, 0.72); }
+      #promotion.open { display: flex; }
+      #promotion .card { background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 16px 18px; }
+      #promotion .card .label { margin-bottom: 10px; }
+      #promotion .card .row button { min-width: 62px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage">
+        <div id="promotion">
+          <div class="card">
+            <div class="label">Promote the pawn to</div>
+            <div class="row">
+              <button data-promote="q">Queen</button>
+              <button data-promote="r">Rook</button>
+              <button data-promote="b">Bishop</button>
+              <button data-promote="n">Knight</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="panel">
+        <h1>Chess</h1>
+        <div class="block">
+          <div class="label">You play</div>
+          <div class="row" id="sides">
+            <button data-side="w" class="on">White</button>
+            <button data-side="b">Black</button>
+          </div>
+        </div>
+        <div class="block">
+          <div class="label">Opponent</div>
+          <select id="level"></select>
+        </div>
+        <div class="block">
+          <div class="row">
+            <button id="new">New game</button>
+            <button id="undo">Take back</button>
+          </div>
+        </div>
+        <div id="status"><div class="who">Loading…</div><div class="note"></div></div>
+        <div id="moves"></div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
