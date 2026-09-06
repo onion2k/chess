@@ -16,7 +16,7 @@ import {
 import { Game } from './chess/game';
 import { LEVELS } from './chess/engine';
 import type { Answer, Ask } from './chess/engine.worker';
-import { A1, LIFT, SQUARE, SetScene, TOP, squareCentre, type MarkerKind, type Standing } from './scene/scene';
+import { A1, DEFAULT_LIVERY, LIFT, SQUARE, SetScene, TOP, squareCentre, type Livery, type MarkerKind, type Standing } from './scene/scene';
 import { onPlane, rayThrough, throughCylinder } from './ray';
 
 // Draft detail: half the triangles on every part. It must be set before any
@@ -29,6 +29,9 @@ const panel = {
   level: document.getElementById('level') as HTMLSelectElement,
   fresh: document.getElementById('new') as HTMLButtonElement,
   undo: document.getElementById('undo') as HTMLButtonElement,
+  randomise: document.getElementById('randomise') as HTMLButtonElement,
+  reset: document.getElementById('reset') as HTMLButtonElement,
+  metals: document.getElementById('metals') as HTMLElement,
   status: document.getElementById('status') as HTMLElement,
   moves: document.getElementById('moves') as HTMLElement,
   promotion: document.getElementById('promotion') as HTMLElement,
@@ -60,6 +63,44 @@ viewer.setInstanced(scene.groups);
 
 /** The board with its border and a little air, which the camera has to hold. */
 const BOARD_BOUNDS = { min: [-150, -150, 0] as [number, number, number], max: [150, 150, 34] as [number, number, number] };
+
+// --- the metals ----------------------------------------------------------
+
+/**
+ * The metals the two armies may be made of. One side stays a warm metal and
+ * the other a white one, however they are dealt, because that is what tells a
+ * player whose man is whose across a board — and it is the difference the set
+ * was drawn around: white's men are enamelled cobalt and set with sapphire,
+ * black's ruby with ruby.
+ */
+const WARM = ['gold', 'copper', 'rose gold', 'brass', 'bronze'];
+const WHITE_METALS = ['silver', 'platinum', 'blackened steel'];
+/** The board can be any of them: it is enamel and stone over its ground. */
+const GROUNDS = [...WARM, ...WHITE_METALS];
+
+let livery: Livery = { ...DEFAULT_LIVERY };
+
+function wear(next: Livery) {
+  livery = next;
+  scene.relivery(livery);
+  viewer.setInstanced(scene.groups);
+  viewer.requestRender();
+}
+
+/** One of these, but not the one it is already wearing. */
+function other(from: string[], than: string): string {
+  const rest = from.filter((m) => m !== than);
+  return rest[Math.floor(Math.random() * rest.length)];
+}
+
+function randomise() {
+  wear({
+    board: other(GROUNDS, livery.board),
+    w: other(WHITE_METALS, livery.w),
+    b: other(WARM, livery.b),
+  });
+  drawPanel();
+}
 
 // --- the game ------------------------------------------------------------
 
@@ -196,7 +237,14 @@ function drawPanel() {
   }
 
   panel.undo.disabled = !game.history.length || thinking;
-  [...panel.sides.children].forEach((b) => b.classList.toggle('on', (b as HTMLElement).dataset.side === human));
+  // which side you play is settled once a move has been made: changing it
+  // mid-game would mean handing your position to the engine
+  for (const b of [...panel.sides.children] as HTMLButtonElement[]) {
+    b.classList.toggle('on', b.dataset.side === human);
+    b.disabled = game.history.length > 0 || thinking;
+  }
+  panel.randomise.disabled = thinking;
+  panel.metals.textContent = metalNote();
   panel.level.value = String(level);
 
   const rows: string[] = [];
@@ -208,6 +256,11 @@ function drawPanel() {
   }
   panel.moves.innerHTML = rows.length ? `<table>${rows.join('')}</table>` : '';
   panel.moves.scrollTop = panel.moves.scrollHeight;
+}
+
+/** What the set is made of, for the panel to say under the two buttons. */
+function metalNote() {
+  return `${livery.w} against ${livery.b}, on ${livery.board}`;
 }
 
 // --- the camera ----------------------------------------------------------
@@ -307,7 +360,24 @@ function playHuman(move: Move) {
   maybeThink();
 }
 
+/**
+ * The view moves only while the meta key is held.
+ *
+ * The orbit binds its own listeners to the canvas, which is a child of the
+ * stage, so a press reaches it before anything here in the bubble. These two
+ * run in the capture phase instead, ahead of it: with the key held they let
+ * the press or the wheel through and the orbit turns, dollies or pans as it
+ * always did; without it they stop the event where it is, and the board is
+ * free for picking men up and putting them down.
+ */
+stage.addEventListener('wheel', (event: WheelEvent) => {
+  if (!event.metaKey) event.stopPropagation();
+}, { capture: true });
+
 stage.addEventListener('pointerdown', (event: PointerEvent) => {
+  if (event.metaKey) return;   // the view's, not the board's
+  event.stopPropagation();
+
   if (event.button !== 0 || promoting) return;
   if (event.target !== stage && !(event.target instanceof HTMLCanvasElement)) return;
   if (game.outcome().over || game.position.turn !== human || thinking) return;
@@ -317,7 +387,6 @@ stage.addEventListener('pointerdown', (event: PointerEvent) => {
 
   // a square already offered: this is the second click of a click and a click
   if (chosen !== null && movesFrom(chosen).some((m) => m.to === sq)) {
-    event.stopPropagation();
     attempt(chosen, sq);
     return;
   }
@@ -325,9 +394,6 @@ stage.addEventListener('pointerdown', (event: PointerEvent) => {
   const piece = game.position.board[sq];
   if (!piece || colourOf(piece) !== human) { chosen = null; refresh(); return; }
 
-  // his own man: pick him up. The orbit never sees this press, so dragging
-  // over the board carries the man rather than turning the view
-  event.stopPropagation();
   chosen = sq;
   const [x, y] = squareCentre(sq);
   carrying = { from: sq, at: [x, y, TOP + LIFT], travelled: 0 };
@@ -335,7 +401,7 @@ stage.addEventListener('pointerdown', (event: PointerEvent) => {
   // a synthesised pointer has no capture to take; the drag works without it
   try { stage.setPointerCapture(event.pointerId); } catch { /* not a real pointer */ }
   refresh();
-});
+}, { capture: true });
 
 stage.addEventListener('pointermove', (event: PointerEvent) => {
   if (carrying) {
@@ -344,7 +410,7 @@ stage.addEventListener('pointermove', (event: PointerEvent) => {
     refresh(true);
     return;
   }
-  if (promoting || thinking || game.position.turn !== human) { stage.classList.remove('grab'); return; }
+  if (event.metaKey || promoting || thinking || game.position.turn !== human) { stage.classList.remove('grab'); return; }
   const sq = squareUnder(event);
   const piece = sq === null ? 0 : game.position.board[sq];
   const overOwn = !!piece && colourOf(piece) === human;
@@ -372,11 +438,20 @@ panel.sides.addEventListener('click', (event) => {
   const side = (event.target as HTMLElement).dataset.side as Colour | undefined;
   if (!side || side === human) return;
   human = side;
-  restart();
+  // the board is always seen from your own side, so it turns round with you
+  restart(true);
 });
 
 panel.level.addEventListener('change', () => { level = Number(panel.level.value); drawPanel(); });
 panel.fresh.addEventListener('click', () => restart());
+panel.randomise.addEventListener('click', () => randomise());
+
+// everything back to how the page opens: the men on their squares, the metals
+// they were cast in, and the view from behind your own men
+panel.reset.addEventListener('click', () => {
+  wear({ ...DEFAULT_LIVERY });
+  restart(true);
+});
 
 panel.undo.addEventListener('click', () => {
   // back to the player's own turn: his move and the answer to it
@@ -401,7 +476,12 @@ panel.promotion.addEventListener('click', (event) => {
   if (move) playHuman(move); else refresh();
 });
 
-function restart() {
+/**
+ * A fresh game. `reframe` puts the camera back behind your own men, which a
+ * new game does not do on its own — a view you have turned to is yours to
+ * keep — but changing sides and the reset button both do.
+ */
+function restart(reframe = false) {
   asked++;
   thinking = false;
   game = new Game();
@@ -411,12 +491,12 @@ function restart() {
   promoting = null;
   engineNote = '';
   panel.promotion.classList.remove('open');
-  faceTheBoard();
+  if (reframe) faceTheBoard();
   refresh();
   maybeThink();
 }
 
-restart();
+restart(true);
 
 // a game in progress is worth keeping across a reload while the page is being
 // worked on; the tools that look at it want a handle on the state

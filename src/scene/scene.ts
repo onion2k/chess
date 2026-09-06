@@ -21,8 +21,9 @@ import { groupByMesh } from '../../vendor/artshape/assembly/groups';
 import { multiply, translation } from '../../vendor/artshape/geom/transform';
 import type { Mat4 } from '../../vendor/artshape/geom/transform';
 import type { InstanceGroup } from '../../vendor/artshape/render/renderer';
+import { metalNames } from '../../vendor/artshape/render/materials';
 import { PIECE_TYPES, fileOf, rankOf, type Colour, type PieceType } from '../chess/board';
-import { BOARD, MARKERS, pieceSketch } from './sketches';
+import { BOARD, LIVERY, MARKERS, pieceSketch } from './sketches';
 
 /** Millimetres between the centres of two squares. */
 export const SQUARE = 22;
@@ -49,6 +50,22 @@ export interface Standing {
   /** Turned about the vertical, in radians: the black knights face the other way. */
   turn: number;
 }
+
+/**
+ * What a group belongs to, so the metals can be changed a side at a time.
+ * The markers are their own thing and keep the gold they were drawn in,
+ * whatever the men are made of.
+ */
+export type Role = 'board' | Colour | 'marker';
+
+/** The metal each part of the set is made of. */
+export interface Livery {
+  board: string;
+  w: string;
+  b: string;
+}
+
+export const DEFAULT_LIVERY: Livery = { board: 'gold', w: LIVERY.w.metal, b: LIVERY.b.metal };
 
 export type MarkerKind = 'quiet' | 'capture' | 'chosen' | 'last';
 const MARKER_KINDS: MarkerKind[] = ['quiet', 'capture', 'chosen', 'last'];
@@ -84,11 +101,13 @@ export function turned(angle: number, x: number, y: number, z: number): Mat4 {
  */
 export class SetScene {
   readonly groups: InstanceGroup[] = [];
+  /** What each group belongs to, by the same index. */
+  private roles: Role[] = [];
   private kinds = new Map<string, Kind>();
   private markers = new Map<MarkerKind, { slices: Slice[]; capacity: number }>();
 
   constructor() {
-    for (const group of build(BOARD)) this.groups.push(group);
+    for (const group of build(BOARD)) this.push(group, 'board');
 
     for (const colour of ['w', 'b'] as Colour[]) {
       for (const type of PIECE_TYPES) {
@@ -98,11 +117,7 @@ export class SetScene {
         for (const group of groups) {
           const locals = split(group.matrices);
           slices.push({ group: this.groups.length, locals });
-          this.groups.push({
-            ...group,
-            dynamic: true,
-            matrices: blank(locals.length * capacity),
-          });
+          this.push({ ...group, dynamic: true, matrices: blank(locals.length * capacity) }, colour);
         }
         this.kinds.set(colour + type, {
           slices, capacity,
@@ -122,8 +137,31 @@ export class SetScene {
       if (!group) throw new Error(`markers: no part enamelled ${MARKER_ENAMEL[kind]} for ${kind}`);
       const locals = split(group.matrices);
       this.markers.set(kind, { slices: [{ group: this.groups.length, locals }], capacity });
-      this.groups.push({ ...group, dynamic: true, matrices: blank(capacity * locals.length) });
+      this.push({ ...group, dynamic: true, matrices: blank(capacity * locals.length) }, 'marker');
     }
+  }
+
+  private push(group: InstanceGroup, role: Role) {
+    this.groups.push(group);
+    this.roles.push(role);
+  }
+
+  /**
+   * Make the board and the two armies of these metals. Only the parts that
+   * are metal at all are changed: a pearl stays nacre, a stone stays its
+   * stone, an enamel keeps its colour, and the markers keep the gold they
+   * were drawn in so they read the same whatever the men are made of.
+   *
+   * The caller hands the groups back to the renderer afterwards; nothing here
+   * touches the meshes, which are what a rebuild would have cost.
+   */
+  relivery(livery: Livery) {
+    this.groups.forEach((group, i) => {
+      const role = this.roles[i];
+      if (role === 'marker') return;
+      if (!metalNames.includes(group.metal ?? '')) return;
+      group.metal = livery[role];
+    });
   }
 
   /**
@@ -207,7 +245,18 @@ function build(source: string) {
 function buildWithBounds(source: string) {
   const { sketch, error } = compile(source);
   if (error) throw new Error(`sketch: ${error.formatted}`);
-  return { groups: groupByMesh(sketch!.assembly), bounds: sketch!.assembly.bounds() };
+  // A part written without a metal of its own takes the sketch's, which the
+  // editor's page applies by setting the renderer's material from the sketch.
+  // Several sketches are drawn here at once and the renderer holds one such
+  // material, so the sketch's is written into each group instead — otherwise
+  // the board's ground and its squares come out polished where the sketch
+  // asked for satin.
+  const groups = groupByMesh(sketch!.assembly).map((g) => ({
+    ...g,
+    metal: g.metal ?? sketch!.metal,
+    finish: g.finish ?? sketch!.finish,
+  }));
+  return { groups, bounds: sketch!.assembly.bounds() };
 }
 
 function split(matrices: Float32Array): Mat4[] {

@@ -37,6 +37,10 @@
       button:disabled { opacity: 0.4; cursor: default; }
       button.on { border-color: var(--accent); color: var(--accent); }
       .row button, select { flex: 1; }
+      .hint { color: var(--dim); font-size: 11px; }
+      #metals { margin-top: 8px; }
+      kbd { font: inherit; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px;
+        padding: 0 4px; color: var(--text); }
       #status { padding: 10px 14px; border-top: 1px solid var(--line); min-height: 58px; }
       #status .who { color: var(--text); }
       #status .note { color: var(--dim); font-size: 11px; }
@@ -89,7 +93,13 @@
             <button id="new">New game</button>
             <button id="undo">Take back</button>
           </div>
+          <div class="row">
+            <button id="randomise" title="new metals for the board and the two armies">Randomise</button>
+            <button id="reset" title="the opening position, the metals it opens in, and the view back where it started">Reset</button>
+          </div>
+          <div class="hint" id="metals"></div>
         </div>
+        <div class="block hint">Hold <kbd>&#8984;</kbd> and drag to turn the view, or scroll to come closer.</div>
         <div id="status"><div class="who">Loading…</div><div class="note"></div></div>
         <div id="moves"></div>
       </div>

@@ -18,14 +18,26 @@ clicked again on the square he is to go to. Either way the squares he may
 go to light: a green disc for an empty square, a red ring round a man who
 may be taken. The last move played keeps a blue-green ring at each end.
 
-Dragging anywhere but on your own man turns the view; the right button
-pans, the wheel comes closer. The board is always seen from your own
-side, and turns round when you change sides.
+The view only moves while the meta key is held: ⌘-drag turns the board,
+⌘-scroll comes closer, ⌘-right-drag pans. Without it the pointer belongs
+to the board, so a drag across it never turns the view by accident. The
+board is always seen from your own side, and turns round when you change
+sides — which you may do until the first move is played, and not after.
 
 All the rules are here: castling, taking in passing, promotion (the piece
 is asked for), checkmate, stalemate, the fifty-move rule, threefold
 repetition, and a draw when neither side has the material to mate. Men
 taken are set down on the table beside the board.
+
+**New game** starts again with the side, level and metals you have, and
+leaves the view where you turned it. **Randomise** recasts the set: a new
+metal for the board and one for each army, always a white metal against a
+warm one so it is still plain whose man is whose — silver, platinum or
+blackened steel against gold, copper, rose gold, brass or bronze. Only
+the metal changes; the enamel, the pearls and the stones are as drawn.
+**Reset** puts everything back to how the page opens: the opening
+position, silver against gold on a gold board, and the view from behind
+your own men.
 
 ## The opponent
 
