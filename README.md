@@ -1,5 +1,7 @@
 # Chess
 
+[![Pages](https://github.com/onion2k/chess/actions/workflows/pages.yml/badge.svg)](https://github.com/onion2k/chess/actions/workflows/pages.yml)
+
 A game of chess played on a precious-metals set: Staunton men, six in
 silver and six in gold, standing on an art deco board on a walnut table,
 drawn by artshape-render, with no editor and no controls.
