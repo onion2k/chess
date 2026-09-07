@@ -155,6 +155,20 @@ GRAPHICS.forEach((g) => {
   panel.graphics.append(option);
 });
 panel.graphics.addEventListener('change', () => chooseGraphics(panel.graphics.value as Graphics));
+// the note copies the viewer's report: one paste from a machine that is elsewhere
+panel.graphicsNote.title = 'click to copy a report of what this machine measured';
+panel.graphicsNote.addEventListener('click', () => {
+  const report = viewer.report('chess');
+  navigator.clipboard.writeText(report).then(
+    () => { panel.graphicsNote.textContent = 'report copied'; },
+    () => {
+      // no clipboard — a page without focus, or a browser that asks — so the report opens as text instead
+      panel.graphicsNote.textContent = 'report opened';
+      window.open(URL.createObjectURL(new Blob([report], { type: 'text/plain' })));
+    },
+  );
+  setTimeout(drawGraphics, 1200);
+});
 
 /** The board with its border and a little air, which the camera has to hold. */
 const BOARD_BOUNDS = { min: [-150, -150, 0] as [number, number, number], max: [150, 150, 34] as [number, number, number] };

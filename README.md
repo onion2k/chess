@@ -55,7 +55,9 @@ megapixel — and, below whichever tier is chosen, what the renderer has
 had to give up to keep up: it times its frames as it goes, draws at fewer
 pixels first, and then, one at a time, without the supersample, with
 coarser soft shadows, without the contact shading, and with the men cast
-at fewer triangles. It gives each back when there is room.
+at fewer triangles. It gives each back when there is room. Clicking the
+note copies a report of all of it — the adapter, what was measured,
+every step the renderer took and why — to paste to whoever is tuning it.
 
 ## The opponent
 
