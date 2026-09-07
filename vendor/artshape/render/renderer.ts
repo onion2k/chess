@@ -29,10 +29,12 @@ import { CushionBake, CUSHION_SIZE } from './cushion';
 import { FULL_BUDGETS, budgetsFor, economyAt, type Budgets, type Economy } from './calibrate';
 import { ContactOcclusion } from './ao';
 import { CanvasRasteriser, CELL, GlyphAtlas, layout as layoutGlyphs, transliterate, type GlyphKey, type Rasteriser } from './glyphs';
-import { envPipelinesReady, bakeEnvironment, filterCube, type EnvImage, type Environment, type EnvPreset, type EnvSamples } from './env';
+import { envPipelinesReady, bakeEnvironment, filterCube, skyDistribution, type EnvImage, type Environment, type EnvPreset, type EnvSamples } from './env';
 import { enamels, finishes, metals, patinaColour, type Finish, type Metal } from './materials';
 import { bakeOcclusion, orthoFromDirection, type Occlusion } from './occlusion';
 import { PostChain, inverseTonemap, type Film } from './post';
+import type { PathTracer } from './tracer';
+import type { SceneRequest, SceneResponse } from './scene.worker';
 import { ANCHOR_WGSL, GROUND_WGSL, PBR_WGSL, PREPASS_WGSL } from './shaders';
 
 const BACKGROUND: [number, number, number] = [0.043, 0.047, 0.055];
@@ -57,7 +59,7 @@ const MAX_LOCAL_SHADOWS = 32;
 const LOCAL_SHADOW_SIZE = 160;
 const LIGHTS_SIZE = 16 + MAX_LIGHTS * 32;
 
-export type Quality = 'draft' | 'final';
+export type Quality = 'draft' | 'final' | 'traced';
 
 /** A light of the studio rig: a disc in the sky like the key, with its own shadow. */
 export interface RigLight {
@@ -103,8 +105,8 @@ export interface InstanceGroup {
    * How many of the placements to draw, from the first. A program that keeps
    * a pool of instances — room for every man a chess set could have, of which
    * a third are ever on the board — allocates the pool once and draws only
-   * the live end of it, rather than paying for the rest every frame. Left out,
-   * every placement is drawn.
+   * the live end of it, rather than paying for the rest of it every frame.
+   * Left out, every placement is drawn.
    */
   count?: number;
 }
@@ -137,12 +139,12 @@ interface GpuGroup {
   indexCount: number;
   /** Placements the group has room for. */
   instanceCount: number;
-  /** Placements actually drawn, from the first: `instanceCount` unless the source says fewer. */
+  /** Placements actually drawn, from the first: `instanceCount` unless the source asks for fewer. */
   drawCount: number;
   vertexCount: number;
 }
 
-/** Placements a group draws: what it says, clamped to what it has room for. */
+/** Placements a group draws: what it asks for, clamped to what it has room for. */
 function liveCount(g: InstanceGroup): number {
   const room = g.matrices.length / 16;
   return g.count === undefined ? room : Math.max(0, Math.min(room, Math.floor(g.count)));
@@ -448,7 +450,7 @@ export class Renderer {
   /** The target's size in pixels, as last told. */
   private width = 1;
   private height = 1;
-  /** Whether the view is moving, as last told: while it does, final quality does not supersample. */
+  /** Whether the view is moving, as last told: while it does, final quality does not supersample and the tracer waits. */
   private moving = false;
 
   private occlusion: Occlusion | null = null;
@@ -797,6 +799,7 @@ export class Renderer {
     env.samples.then((samples) => {
       if (this.environment !== env) return;
       this.envSamples = samples;
+      this.tracer?.setSky(skyDistribution(samples).cdf, samples.size);
       if (this.groups.length) this.bakeOcclusion();
       this.dirty = true;
     });
@@ -949,6 +952,8 @@ export class Renderer {
       c ? c.size : 1, c ? c.slope : 0, 0, 0,
     ]));
     this.cushionDirty = true;
+    // the tracer reads the table's record and the cushion: a new table is a new scene to it
+    this.tracer?.reset();
     this.dirty = true;
   }
 
@@ -980,6 +985,9 @@ export class Renderer {
   setQuality(q: Quality) {
     if (q === this.quality) return;
     this.quality = q;
+    // asking for traced quality again is another go at fetching the tracer,
+    // where a first attempt failed; between the two, nothing is retried
+    if (q === 'traced') this.traceLoadFailed = false;
     this.applySize();
     if (this.groups.length && this.envSamples) this.bakeQueued = true;
     this.dirty = true;
@@ -1064,14 +1072,16 @@ export class Renderer {
     } else if (this.envSamples) this.bakeOcclusion();
     else this.clearOcclusion();
     this.writeMaterials();
+    this.traceMaterialBind = null;
+    this.traceSceneStale = true;
     this.dirty = true;
   }
 
   /**
    * Move one group's placements: the same count of matrices, written in
    * place. What follows the placement is redone — the key's and the rig's
-   * shadows, the cushion, the probe, the piece's own lights —
-   * and the sky occlusion is baked again only for a static group;
+   * shadows, the cushion, the probe, the piece's own lights, the traced
+   * scene — and the sky occlusion is baked again only for a static group;
    * a dynamic one moves under the bake that stands.
    */
   move(group: number, matrices: Float32Array, count?: number) {
@@ -1079,11 +1089,14 @@ export class Renderer {
   }
 
   /**
-   * Move several groups as one change. What follows a placement — the scene's
-   * bounds, the lights, the probe — is done once however many groups moved,
-   * which matters when one thing on screen is made of a dozen meshes and is
-   * dragged: a dozen separate `move` calls would re-measure the whole scene a
-   * dozen times for one movement of the pointer.
+   * Move several groups as one change, and say how many of each are drawn.
+   *
+   * What follows a placement — the scene's bounds, the lights, the probe, the
+   * traced scene — is done once however many groups moved, which matters when
+   * one thing on screen is made of a dozen meshes and is dragged: a dozen
+   * separate `move` calls re-measure the whole scene a dozen times for one
+   * movement of the pointer. `count` is the group's live placements, for a
+   * pool whose used end grows and shrinks.
    */
   moveAll(updates: Array<{ group: number; matrices: Float32Array; count?: number }>) {
     if (!updates.length) return;
@@ -1106,9 +1119,13 @@ export class Renderer {
     this.localShadowDirty = true;
     this.writeLights();
     this.invalidateProbe();
+    this.traceSceneStale = true;
     if (bake && this.envSamples) this.bakeOcclusion();
     this.dirty = true;
   }
+
+  /** The tracer's own settings, for a test or a tool: null until traced quality has been used. */
+  get pathTracer() { return this.tracer; }
 
   /** Bakes of the sky occlusion begun, for measuring what a change costs. */
   occlusionBakes = 0;
@@ -1137,6 +1154,137 @@ export class Renderer {
     this.sceneTop = max[2];
     // the table under the piece is in the shadow's view too, so it reaches out to the occlusion bake's ground radius
     this.sceneRadius = Math.max(1e-3, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2) * 1.9;
+  }
+
+  // --- the path tracer: final quality, traced while the view is still ---
+  /**
+   * The tracer and its BVH are fetched on the first traced frame and not
+   * before. They are a third of the render code and nothing else imports
+   * them, so a program that never asks for traced quality — a game, a
+   * maker's catalogue, anything drawn in raster — never loads them, and the
+   * bundle it starts with is the smaller for it. Until the module lands the
+   * raster frame is what is drawn, which is what a moving view shows anyway.
+   */
+  private traceModule: typeof import('./tracer') | null = null;
+  private bvhModule: typeof import('./bvh') | null = null;
+  /** While the import is in flight; false again whether it lands or fails. */
+  private traceLoading = false;
+  /** Set when the import failed: asked for again, it is tried again rather than never. */
+  private traceLoadFailed = false;
+
+  private loadTraceModule() {
+    if (this.traceLoading) return;
+    this.traceLoading = true;
+    this.traceLoadFailed = false;
+    Promise.all([import('./tracer'), import('./bvh')]).then(([tracer, bvh]) => {
+      this.traceModule = tracer;
+      this.bvhModule = bvh;
+      this.traceLoading = false;
+      // it landed: a frame is due, and this time there is something to sample with
+      this.dirty = true;
+    }, (err) => {
+      this.traceLoading = false;
+      this.traceLoadFailed = true;
+      console.error('the path tracer could not be loaded:', err);
+    });
+  }
+
+  private tracer: PathTracer | null = null;
+  private traceMaterialBind: GPUBindGroup | null = null;
+  private traceSceneStale = true;
+  /** The scene builder off the main thread, made on first use; null where there are no workers, and the build is done here. */
+  private sceneWorker: Worker | null | undefined;
+  /** Numbers the build in flight, so a scene for a piece since replaced is dropped. */
+  private sceneToken = 0;
+  private sceneBuilding = false;
+  private traceFrame = new Float32Array(FRAME_SIZE / 4);
+  /** Samples the tracer has taken into the current view, for the panel to show. */
+  get traceSamples() { return this.tracer?.samples ?? 0; }
+  get traceLimit() { return this.tracer?.maxSamples ?? 0; }
+
+  private ensureTracer(): PathTracer | null {
+    const mod = this.traceModule;
+    if (!mod || !this.bvhModule) {
+      if (!this.traceLoadFailed) this.loadTraceModule();
+      return null;
+    }
+    if (!this.tracer) {
+      this.tracer = new mod.PathTracer(this.ctx, this.frameLayout, this.mmPerUnit);
+      if (this.envSamples) this.tracer.setSky(skyDistribution(this.envSamples).cdf, this.envSamples.size);
+    }
+    if (this.traceSceneStale && this.groups.length) {
+      this.traceSceneStale = false;
+      const groups = this.groups.map((g) => ({ mesh: g.source.mesh, matrices: g.source.matrices.subarray(0, g.drawCount * 16), wear: wearOf(g.source.mesh, this.mm(0.6)) }));
+      const token = ++this.sceneToken;
+      const worker = this.ensureSceneWorker();
+      if (worker) {
+        // built off the thread: the raster view stays live, and a sample starts when the scene lands
+        this.sceneBuilding = true;
+        const request: SceneRequest = { token, groups };
+        worker.postMessage(request);
+      } else {
+        this.tracer.setScene(this.bvhModule.buildScene(groups), this.groundBuffer, this.cushion.height.createView());
+      }
+    }
+    if (!this.traceMaterialBind && this.materialBuffer && this.glyphBuffer && this.atlasTexture && this.gemPlaneBuffer) {
+      this.traceMaterialBind = this.ctx.device.createBindGroup({
+        label: 'trace materials', layout: this.tracer.materialLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.materialBuffer } },
+          { binding: 1, resource: { buffer: this.glyphBuffer } },
+          { binding: 2, resource: this.atlasTexture.createView() },
+        ],
+      });
+    }
+    return this.tracer;
+  }
+
+  private ensureSceneWorker(): Worker | null {
+    if (this.sceneWorker !== undefined) return this.sceneWorker;
+    if (typeof Worker === 'undefined') return (this.sceneWorker = null);
+    const worker = new Worker(new URL('./scene.worker.ts', import.meta.url), { type: 'module' });
+    worker.addEventListener('message', (e: MessageEvent<SceneResponse>) => {
+      if (e.data.token !== this.sceneToken) return;
+      this.sceneBuilding = false;
+      if (!this.tracer || !this.groups.length) return;
+      this.tracer.setScene(e.data.scene, this.groundBuffer, this.cushion.height.createView());
+      this.dirty = true;
+    });
+    return (this.sceneWorker = worker);
+  }
+
+  /** One more sample of the still view, or nothing if the accumulation is complete. Returns whether a frame was drawn. */
+  private traceFrameStep(encoder: GPUCommandEncoder, frame: Float32Array): boolean {
+    const tracer = this.ensureTracer();
+    // the module is still being fetched, or has just failed to: the raster
+    // frame is drawn instead, and the load marks one due when it lands
+    if (!tracer) return false;
+    // the tracer's own pipeline is compiling: nothing to take a sample with yet, so come back
+    if (!tracer.compiled) { this.dirty = true; return false; }
+    if (!this.traceMaterialBind || !this.frameBind || !this.post.sceneTexture || this.sceneBuilding || !tracer.hasScene) return false;
+    tracer.resize(this.post.renderWidth, this.post.renderHeight, this.post.sceneTexture);
+    // anything that moved — the camera, a light, the exposure — starts the accumulation over
+    let same = true;
+    for (let i = 0; i < frame.length; i++) { if (frame[i] !== this.traceFrame[i]) { same = false; break; } }
+    if (!same) { this.traceFrame.set(frame); tracer.reset(); }
+    if (tracer.done) return false;
+    const cam = this.camera;
+    const fwd = [cam.target[0] - cam.position[0], cam.target[1] - cam.position[1], cam.target[2] - cam.position[2]];
+    const len = Math.hypot(fwd[0], fwd[1], fwd[2]) || 1;
+    const tanHalf = Math.tan((cam.fov * Math.PI) / 360);
+    const focus = this.focusDistance;
+    const h = this.post.renderHeight;
+    const maxRadius = Math.max(6, Math.min(this.post.renderWidth, h) * 0.03);
+    // the lens that blurs a point twice the focus distance away by the raster pass's circle
+    const aperture = this.dof > 0 ? 2 * this.dof * maxRadius * 2 * focus * tanHalf / h : 0;
+    tracer.sample(encoder, this.frameBind, this.traceMaterialBind, {
+      origin: [cam.position[0], cam.position[1], cam.position[2]],
+      forward: [fwd[0] / len, fwd[1] / len, fwd[2] / len],
+      right: cam.right as [number, number, number],
+      up: cam.up as [number, number, number],
+      tanHalf, aspect: cam.aspect, aperture, focus, shift: cam.shift,
+    }, !!this.occlusion);
+    return true;
   }
 
   /** Occlusion entries are laid out group by group, placement by placement. */
@@ -1264,6 +1412,8 @@ export class Renderer {
     this.environment?.dispose();
     this.occlusion?.dispose();
     this.post.dispose();
+    this.sceneWorker?.terminate();
+    this.sceneWorker = null;
     for (const g of this.groups) { g.instance.destroy(); g.selected.destroy(); }
     for (const b of this.meshBuffers.values()) for (const buffer of [b.position, b.normal, b.uv, b.wear, b.face, b.engrave, b.index]) buffer.destroy();
     this.meshBuffers.clear();
@@ -1499,6 +1649,25 @@ export class Renderer {
       device.queue.writeBuffer(this.frameBuffer, 0, frame);
     }
 
+    // traced quality: while the view is still, a sample a frame into the
+    // accumulation and the mean through the film; while it moves, the raster path
+    if (this.quality === 'traced' && !moving && this.groups.length && this.occlusion) {
+      if (this.traceFrameStep(encoder, frame)) {
+        this.post.finish(encoder, target(), {
+          bloom: this.bloom, raw: this.debugMode > 0, film: this.film,
+          focus: this.focusDistance, dof: 0, subject: this.subjectDistance, peaking: this.focusHelper,
+        });
+        device.queue.submit([encoder.finish()]);
+        this.dirty = !this.tracer!.done;
+        return true;
+      }
+      if (this.tracer?.done) {
+        // nothing more to add: the last frame stands
+        device.queue.submit([encoder.finish()]);
+        return false;
+      }
+    }
+
     if (this.contactDrawn && this.ao.depthView) {
       // the piece's depth alone, for the contact occlusion
       const dp = encoder.beginRenderPass({
@@ -1677,6 +1846,7 @@ export class Renderer {
   /** Per-group material and occlusion slice, 240 bytes at a 256-byte stride. */
   private writeMaterials() {
     if (!this.materialBuffer) return;
+    this.tracer?.reset();
     const data = new ArrayBuffer(Math.max(1, this.groups.length) * MATERIAL_STRIDE);
     const f32 = new Float32Array(data);
     const u32 = new Uint32Array(data);

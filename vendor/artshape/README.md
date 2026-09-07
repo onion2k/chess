@@ -3,11 +3,11 @@
 A copy of the artshape renderer and the language that feeds it, taken so
 this game can be built and deployed on its own. Nothing here is chess.
 
-Taken from `artshape` at commit `15f701eadc9213aaec8bcdc3276841e4789f482c`, September 2026;
-`gpu/context.ts`, `render/viewer.ts`, `render/calibrate.ts`,
-`render/shaders.ts` and the calibration's edits to `render/renderer.ts`
-(two getters, the economy, the frame's `shadowTaps`) brought up to
-`8dc3b6c`: the calibration, the ladder, `pending` counting a bake between its chunks, a fallback adapter starting low, the report, the first frame fenced, and every pipeline compiled off the main thread, and the bakes following the verdict.
+Taken from `artshape`, and kept current with it; the render, gpu, geom,
+mesh, parts, pattern, assembly and dsl trees are copied whole. Level with
+`69ee383`: the calibration and its ladder, the report, the first frame fenced,
+every pipeline compiled off the main thread, the bakes following the
+verdict, and the tracer fetched only when it is asked for.
 
 ## What was copied
 
@@ -18,24 +18,22 @@ itself.
 
 ## What was changed
 
-Three edits, all of them removals, so a later `diff` against artshape
-stays readable:
+One edit. Everything else, `render/renderer.ts` and `render/viewer.ts`
+included, is byte-identical to artshape's, so keeping this copy current
+is a copy and never a patch.
 
-1. **The path tracer is gone.** `render/tracer.ts`, `render/bvh.ts` and
-   `render/scene.worker.ts` were deleted, along with everything in
-   `render/renderer.ts` that reached for them: the imports, the
-   `traced` member of `Quality`, the scene-building and sample steps,
-   and the `pathTracer` accessor. The game draws in draft raster and
-   would never have started a trace.
-2. **`render/viewer.ts`** lost the two getters that reported the tracer's
-   sample count.
-3. **`dsl/examples.ts` is gone**, and `dsl/index.ts` no longer falls back
+1. **`dsl/examples.ts` is gone**, and `dsl/index.ts` no longer falls back
    to it when resolving a `use`. The game's own sketches live in
-   `src/scene/sketches.ts`.
-4. **Nothing else.** `Renderer.moveAll` and the per-group draw `count` were
-   written here first and are now upstream in artshape, with tests, so they
-   are no longer differences — the code either side is the same but for the
-   tracer line in `moveAll`, which only artshape has.
+   `src/scene/sketches.ts`. This is the last difference, and it is really
+   a fault upstream — the language defaulting to the page's own example
+   sketches is the library reaching up into the application — so it should
+   end with that default rather than with a local edit.
+2. **Nothing else.** The path tracer was deleted here until artshape made
+   it load on demand; `render/{tracer,bvh,scene.worker}.ts` are copied now
+   and never fetched, since the game draws in raster and asks for a traced
+   frame from nowhere. They cost the deployed site 59 kB it never sends
+   and save every future change to `renderer.ts` from being applied twice
+   by hand.
 
 ## Sent back
 

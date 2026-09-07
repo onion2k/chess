@@ -284,6 +284,8 @@ export class Viewer {
   setSelection(selected: Array<Float32Array<ArrayBuffer>> | null) { this.renderer.setSelection(selected); }
   setAnchors(anchors: Anchor[], scale: number) { this.renderer.setAnchors(anchors, scale); }
   requestRender() { this.renderer.requestRender(); }
+  get traceSamples() { return this.renderer.traceSamples; }
+  get traceLimit() { return this.renderer.traceLimit; }
 
   /** Depth of field: 0 off, 1 a lens wide open; focus as a multiple of the distance to the orbit target, 1 being the target itself. */
   setDepthOfField(strength: number, focusScale: number) {
