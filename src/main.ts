@@ -67,6 +67,10 @@ LEVELS.forEach((level, i) => {
   panel.level.append(option);
 });
 
+/** The wait for the first frame, told what it is waiting on; gone once a frame has landed. */
+const loading = document.getElementById('loading') as HTMLElement;
+const waitingOn = (what: string) => { loading.querySelector('.what')!.textContent = what; };
+
 const viewer = await Viewer.create(stage, (info) => {
   panel.status.querySelector('.who')!.textContent = 'The graphics device was lost';
   panel.status.querySelector('.note')!.textContent = info.message || 'reload the page';
@@ -82,8 +86,20 @@ viewer.setTable('walnut');
 viewer.setLens(46);
 viewer.setFilm({ tonemap: 1, vignette: 0.3, grain: 0.25, fringe: 0.3 });
 
+waitingOn('Casting the set…');
+performance.mark('chess:casting');
+// the panel gets a paint before the cast, which holds the thread
+await new Promise((r) => setTimeout(r, 0));
 let scene = new SetScene();
+performance.mark('chess:cast');
 viewer.setInstanced(scene.groups);
+waitingOn('Compiling the shaders…');
+viewer.onFirstFrame = (ms) => {
+  performance.mark('chess:first-frame');
+  loading.classList.add('done');
+  setTimeout(() => loading.remove(), 500);
+  console.info(`first frame ${ms.toFixed(0)} ms after submit; ${(performance.now() / 1000).toFixed(2)} s from the page's start`);
+};
 
 /**
  * Draw at a tier. The quality and the scale take at once; a change of detail

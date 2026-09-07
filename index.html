@@ -53,6 +53,13 @@
       #moves td.m { width: 42%; }
       #moves tr.latest td.m.live { color: var(--accent); }
 
+      /* the wait for the first frame: the device, the set cast, the shaders compiled */
+      #loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 14px; color: var(--dim); background: var(--bg); pointer-events: none; transition: opacity 0.4s; }
+      #loading.done { opacity: 0; }
+      #loading .ring { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent);
+        animation: turn 0.9s linear infinite; }
+      @keyframes turn { to { transform: rotate(360deg); } }
       #promotion { position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
         background: rgba(11, 12, 14, 0.72); }
       #promotion.open { display: flex; }
@@ -64,6 +71,7 @@
   <body>
     <div id="app">
       <div id="stage">
+        <div id="loading"><div class="ring"></div><div class="what">Starting the graphics device…</div></div>
         <div id="promotion">
           <div class="card">
             <div class="label">Promote the pawn to</div>
