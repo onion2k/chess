@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compile } from '../../../vendor/artshape/dsl/index';
-import { groupByMesh } from '../../../vendor/artshape/assembly/groups';
+import { compile } from 'artshape-render/dsl';
+import { groupByMesh } from 'artshape-render/assembly/groups';
 import { BOARD, MARKERS, pieceSketch } from '../sketches';
 import { PIECE_TYPES } from '../../chess/board';
 

@@ -12,10 +12,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "earcut": "^3.2.3"
+    "artshape-render": "github:onion2k/artshape-render#v0.1.0"
   },
   "devDependencies": {
-    "@types/earcut": "^3.0.0",
     "@webgpu/types": "^0.1.72",
     "typescript": "^5.7.2",
     "vite": "^6.0.7",

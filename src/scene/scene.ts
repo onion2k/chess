@@ -16,12 +16,12 @@
  * matrix multiplies through it.
  */
 
-import { compile } from '../../vendor/artshape/dsl/index';
-import { groupByMesh } from '../../vendor/artshape/assembly/groups';
-import { multiply, translation } from '../../vendor/artshape/geom/transform';
-import type { Mat4 } from '../../vendor/artshape/geom/transform';
-import type { InstanceGroup } from '../../vendor/artshape/render/renderer';
-import { metalNames } from '../../vendor/artshape/render/materials';
+import { compile } from 'artshape-render/dsl';
+import { groupByMesh } from 'artshape-render/assembly/groups';
+import { multiply, translation } from 'artshape-render/geom/transform';
+import type { Mat4 } from 'artshape-render/geom/transform';
+import type { InstanceGroup } from 'artshape-render/render/renderer';
+import { metalNames } from 'artshape-render/render/materials';
 import { PIECE_TYPES, fileOf, rankOf, type Colour, type PieceType } from '../chess/board';
 import { BOARD, LIVERY, MARKERS, pieceSketch } from './sketches';
 

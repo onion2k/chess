@@ -2,8 +2,7 @@
 
 A game of chess played on a precious-metals set: Staunton men, six in
 silver and six in gold, standing on an art deco board on a walnut table,
-drawn by artshape — the renderer, vendored, with no editor and no
-controls.
+drawn by artshape-render, with no editor and no controls.
 
 Played at **https://onion2k.github.io/chess/**, or run it yourself:
 
@@ -82,10 +81,14 @@ The search runs in a worker, so the board stays turnable while it thinks.
 ## How it is put together
 
     src/chess/     the rules, the notation, the game, the engine, its worker
-    src/scene/     the set as artshape sketches, and the set on the renderer
+    src/scene/     the set as sketches, and the set on the renderer
     src/ray.ts     a point on the canvas into a ray in the board's millimetres
     src/main.ts    the page: the look, the pointer, the panel
-    vendor/        artshape, copied — see vendor/artshape/README.md
+
+The drawing is all `artshape-render`, a dependency: the parts, the
+assembly, the language and the renderer. It was vendored into `vendor/`
+until September 2026, when it became a repository of its own — this game
+having been the argument that it was a library.
 
 ## The set
 
@@ -138,10 +141,12 @@ both plies, and the board turns round when you play black.
 
 ## What it costs to load
 
-The bundle is 344 kB, 110 kB over the wire, and the game is on screen in
-well under a tenth of a second on a warm device. Three things got it
-there, and the numbers are worth keeping because each was measured rather
-than guessed:
+The bundle is 365 kB, 117 kB over the wire, and the game is on screen in
+about a quarter of a second on a warm device. It sends none of the path
+tracer: the renderer fetches that on the first traced frame, and the game
+asks for one from nowhere, so its 46 kB sits on the server unread. Three
+things got the rest of it there, and the numbers are worth keeping
+because each was measured rather than guessed:
 
 - **Only the men standing are drawn.** Every kind of man is allocated at
   the most of him the rules allow — nine queens, ten knights — but a game
@@ -158,7 +163,7 @@ than guessed:
   carries a running commentary that is the best thing in the file to read
   and the worst thing to send — a fifth of the bundle, which the GPU never
   sees. `wgsl-minify.ts` takes it out of a production build only:
-  **378 kB to 344 kB**, 123 kB to 110 kB gzipped.
+  **a tenth of the bundle**, and it costs the reader nothing.
 
 ## Deploying
 
@@ -173,5 +178,4 @@ The built game is served from a project page, so `vite.config.ts` sets
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE). That covers the vendored copy of artshape
-under `vendor/` as well as the game itself.
+MIT — see [LICENSE](LICENSE).

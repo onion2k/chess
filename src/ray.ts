@@ -1,8 +1,8 @@
 /** Turning a point on the canvas into a ray in the board's own millimetres. */
 
-import type { Camera } from '../vendor/artshape/gpu/camera';
-import { invert } from '../vendor/artshape/geom/transform';
-import type { Vec3 } from '../vendor/artshape/geom/types';
+import type { Camera } from 'artshape-render/gpu/camera';
+import { invert } from 'artshape-render/geom/transform';
+import type { Vec3 } from 'artshape-render/geom/types';
 
 export interface Ray { origin: Vec3; direction: Vec3 }
 

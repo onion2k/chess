@@ -7,8 +7,8 @@
  * which squares he may go to, and whose turn it is.
  */
 
-import { RUNGS, TIERS, tierFor, Viewer, type Tier } from '../vendor/artshape/render/viewer';
-import { detail, setDetail } from '../vendor/artshape/mesh/detail';
+import { RUNGS, TIERS, tierFor, Viewer, type Tier } from 'artshape-render/render/viewer';
+import { detail, setDetail } from 'artshape-render/mesh/detail';
 import {
   colourOf, legalMoves, square, squareFromName, squareName, toFen, typeOf,
   type Colour, type Move, type PieceType,
