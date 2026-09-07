@@ -3,7 +3,9 @@
 A copy of the artshape renderer and the language that feeds it, taken so
 this game can be built and deployed on its own. Nothing here is chess.
 
-Taken from `artshape` at commit `15f701eadc9213aaec8bcdc3276841e4789f482c`, September 2026.
+Taken from `artshape` at commit `15f701eadc9213aaec8bcdc3276841e4789f482c`, September 2026;
+`gpu/context.ts`, `render/viewer.ts`, `render/calibrate.ts` and the two
+getters in `render/renderer.ts` brought up to `b6d1c24`, the calibration.
 
 ## What was copied
 

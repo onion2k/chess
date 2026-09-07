@@ -41,6 +41,18 @@ the metal changes; the enamel, the pearls and the stones are as drawn.
 position, silver against gold on a gold board, and the view from behind
 your own men.
 
+## Graphics
+
+The page measures the machine it opens on: once the set is on screen it
+times a few frames and chooses. **Auto** is that choice — `balanced` on a
+desktop, `fast` on a laptop with an integrated GPU, where the men are cast
+with fewer triangles and drawn at fewer pixels. **Fine** is the renderer's
+final quality at full detail, for looking at rather than playing on, and
+is only ever chosen. The choice is kept across visits, and so is the
+measurement, so the page opens at the right size before its first frame.
+The note under the picker says what was measured, in milliseconds per
+megapixel.
+
 ## The opponent
 
 Five levels, in `src/chess/engine.ts`. All five are the same alpha-beta

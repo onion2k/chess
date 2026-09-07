@@ -38,7 +38,7 @@
       button.on { border-color: var(--accent); color: var(--accent); }
       .row button, select { flex: 1; }
       .hint { color: var(--dim); font-size: 11px; }
-      #metals { margin-top: 8px; }
+      #metals, #graphics-note { margin-top: 8px; }
       kbd { font: inherit; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px;
         padding: 0 4px; color: var(--text); }
       #status { padding: 10px 14px; border-top: 1px solid var(--line); min-height: 58px; }
@@ -98,6 +98,11 @@
             <button id="reset" title="the opening position, the metals it opens in, and the view back where it started">Reset</button>
           </div>
           <div class="hint" id="metals"></div>
+        </div>
+        <div class="block">
+          <div class="label">Graphics</div>
+          <select id="graphics" title="auto measures this machine and chooses; fast draws fewer triangles at fewer pixels; fine is final quality at full detail"></select>
+          <div class="hint" id="graphics-note"></div>
         </div>
         <div class="block hint">Hold <kbd>&#8984;</kbd> and drag to turn the view, or scroll to come closer.</div>
         <div id="status"><div class="who">Loading…</div><div class="note"></div></div>

@@ -7,8 +7,8 @@
  * which squares he may go to, and whose turn it is.
  */
 
-import { Viewer } from '../vendor/artshape/render/viewer';
-import { setDetail } from '../vendor/artshape/mesh/detail';
+import { TIERS, tierFor, Viewer, type Tier } from '../vendor/artshape/render/viewer';
+import { detail, setDetail } from '../vendor/artshape/mesh/detail';
 import {
   colourOf, legalMoves, square, squareFromName, squareName, toFen, typeOf,
   type Colour, type Move, type PieceType,
@@ -19,14 +19,37 @@ import type { Answer, Ask } from './chess/engine.worker';
 import { A1, DEFAULT_LIVERY, LIFT, SQUARE, SetScene, TOP, squareCentre, type Livery, type MarkerKind, type Standing } from './scene/scene';
 import { onPlane, rayThrough, throughCylinder } from './ray';
 
-// Draft detail: half the triangles on every part. It must be set before any
-// mesh is built, which is before the scene below is put together.
-setDetail(0.5);
+// --- the graphics -------------------------------------------------------
+
+/**
+ * How much is asked of the machine: one of the renderer's tiers, or `auto`,
+ * which is whichever the machine measures itself into — `balanced` on a
+ * desktop, `fast` on a laptop with an integrated GPU. The choice is kept
+ * across visits. Detail must be set before any mesh is built, which is before
+ * the scene below is put together, so the choice is read first of all.
+ */
+type Graphics = Tier | 'auto';
+const GRAPHICS_KEY = 'chess.graphics';
+const GRAPHICS: Graphics[] = ['auto', 'fast', 'balanced', 'fine'];
+
+function storedGraphics(): Graphics {
+  try {
+    const v = localStorage.getItem(GRAPHICS_KEY) as Graphics | null;
+    return v && GRAPHICS.includes(v) ? v : 'auto';
+  } catch { return 'auto'; }
+}
+
+let graphics: Graphics = storedGraphics();
+/** The tier drawn at: the choice, or what the machine measured when the choice is `auto`. */
+let tier: Tier = graphics === 'auto' ? 'balanced' : graphics;
+setDetail(TIERS[tier].detail);
 
 const stage = document.getElementById('stage') as HTMLElement;
 const panel = {
   sides: document.getElementById('sides') as HTMLElement,
   level: document.getElementById('level') as HTMLSelectElement,
+  graphics: document.getElementById('graphics') as HTMLSelectElement,
+  graphicsNote: document.getElementById('graphics-note') as HTMLElement,
   fresh: document.getElementById('new') as HTMLButtonElement,
   undo: document.getElementById('undo') as HTMLButtonElement,
   randomise: document.getElementById('randomise') as HTMLButtonElement,
@@ -50,7 +73,8 @@ const viewer = await Viewer.create(stage, (info) => {
 });
 
 // the look, once: the artshape page's own opening settings
-viewer.setQuality('draft');
+viewer.setQuality(TIERS[tier].quality);
+viewer.setRenderScale(TIERS[tier].renderScale);
 viewer.setEnvironment('studio');
 viewer.setEnvStrength(0.3);
 viewer.setKeyLight({ elevation: Math.PI / 4, azimuth: -Math.PI / 4, strength: 1, warmth: 0.3, size: 0.08 });
@@ -58,8 +82,67 @@ viewer.setTable('walnut');
 viewer.setLens(46);
 viewer.setFilm({ tonemap: 1, vignette: 0.3, grain: 0.25, fringe: 0.3 });
 
-const scene = new SetScene();
+let scene = new SetScene();
 viewer.setInstanced(scene.groups);
+
+/**
+ * Draw at a tier. The quality and the scale take at once; a change of detail
+ * means every man cast again, which is a second or so, and only happens when
+ * the detail actually differs.
+ */
+function applyTier(next: Tier) {
+  tier = next;
+  viewer.setQuality(TIERS[tier].quality);
+  viewer.setRenderScale(TIERS[tier].renderScale);
+  if (TIERS[tier].detail !== detail()) {
+    setDetail(TIERS[tier].detail);
+    scene = new SetScene();
+    scene.relivery(livery);
+    viewer.setInstanced(scene.groups);
+    refresh();
+  }
+  viewer.requestRender();
+  drawGraphics();
+}
+
+function chooseGraphics(next: Graphics) {
+  graphics = next;
+  try { localStorage.setItem(GRAPHICS_KEY, next); } catch { /* kept for this visit only */ }
+  if (next === 'auto') {
+    // measured in draft, at the working detail, which is what the verdict is a verdict on
+    if (tier === 'fine') applyTier('balanced');
+    calibrate();
+  } else applyTier(next);
+}
+
+/**
+ * Time a few frames of the set and choose a tier from the cost — or, with the
+ * page hidden and nothing to draw at, wait until it is shown and measure then.
+ */
+function calibrate() {
+  viewer.calibrate().then((verdict) => {
+    if (verdict) { if (graphics === 'auto') applyTier(tierFor(verdict.msPerMpx)); drawGraphics(); return; }
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) calibrate(); }, { once: true });
+  }, (err) => console.warn('calibration failed:', err));
+}
+
+/** The picker and its note: the adapter, its measured cost, and the tier being drawn at. */
+function drawGraphics() {
+  panel.graphics.value = graphics;
+  const a = viewer.adapter;
+  const name = [a.vendor, a.architecture].filter(Boolean).join(' ') || 'unknown GPU';
+  const v = viewer.verdict;
+  const measured = v ? `${v.msPerMpx.toFixed(0)} ms per megapixel` : 'measuring…';
+  panel.graphicsNote.textContent = `${name}: ${measured}${graphics === 'auto' ? ` → ${tier}` : ''}`;
+}
+
+GRAPHICS.forEach((g) => {
+  const option = document.createElement('option');
+  option.value = g;
+  option.textContent = g;
+  panel.graphics.append(option);
+});
+panel.graphics.addEventListener('change', () => chooseGraphics(panel.graphics.value as Graphics));
 
 /** The board with its border and a little air, which the camera has to hold. */
 const BOARD_BOUNDS = { min: [-150, -150, 0] as [number, number, number], max: [150, 150, 34] as [number, number, number] };
@@ -497,6 +580,9 @@ function restart(reframe = false) {
 }
 
 restart(true);
+drawGraphics();
+// the set is on screen: measure it, and draw at what this machine can manage
+if (graphics === 'auto') calibrate();
 
 // a game in progress is worth keeping across a reload while the page is being
 // worked on; the tools that look at it want a handle on the state
@@ -508,7 +594,9 @@ Object.assign(window, {
     get carrying() { return carrying; },
     get thinking() { return thinking; },
     set level(v: number) { level = v; panel.level.value = String(v); },
-    viewer, scene,
+    viewer,
+    get scene() { return scene; },
+    get tier() { return tier; },
     moves: () => legalMoves(game.position).map((m) => squareName(m.from) + squareName(m.to)),
     /** Set up a position, for a test or a puzzle. */
     setup: (fen: string) => { asked++; thinking = false; game = new Game(fen); chosen = null; carrying = null; lastMove = null; engineNote = ''; refresh(); maybeThink(); },
