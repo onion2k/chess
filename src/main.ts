@@ -7,7 +7,7 @@
  * which squares he may go to, and whose turn it is.
  */
 
-import { TIERS, tierFor, Viewer, type Tier } from '../vendor/artshape/render/viewer';
+import { RUNGS, TIERS, tierFor, Viewer, type Tier } from '../vendor/artshape/render/viewer';
 import { detail, setDetail } from '../vendor/artshape/mesh/detail';
 import {
   colourOf, legalMoves, square, squareFromName, squareName, toFen, typeOf,
@@ -94,8 +94,10 @@ function applyTier(next: Tier) {
   tier = next;
   viewer.setQuality(TIERS[tier].quality);
   viewer.setRenderScale(TIERS[tier].renderScale);
-  if (TIERS[tier].detail !== detail()) {
-    setDetail(TIERS[tier].detail);
+  // the tier's detail, and less again when the viewer's ladder has found the machine cannot draw it
+  const d = TIERS[tier].detail * viewer.detailFactor;
+  if (d !== detail()) {
+    setDetail(d);
     scene = new SetScene();
     scene.relivery(livery);
     viewer.setInstanced(scene.groups);
@@ -133,8 +135,18 @@ function drawGraphics() {
   const name = [a.vendor, a.architecture].filter(Boolean).join(' ') || 'unknown GPU';
   const v = viewer.verdict;
   const measured = v ? `${v.msPerMpx.toFixed(0)} ms per megapixel` : 'measuring…';
-  panel.graphicsNote.textContent = `${name}: ${measured}${graphics === 'auto' ? ` → ${tier}` : ''}`;
+  const { scale, rung } = viewer.pacing;
+  noted = { rung, scale };
+  const at = scale < 1 ? `, at ${Math.round(scale * 100)}%` : '';
+  const without = rung > 0 ? `, without ${RUNGS.slice(0, rung).join(', ')}` : '';
+  panel.graphicsNote.textContent = `${name}: ${measured}${graphics === 'auto' ? ` → ${tier}` : ''}${at}${without}`;
 }
+
+// the ladder's last rung is the detail, and that is the page's to recast
+viewer.onDetail = () => applyTier(tier);
+// the note follows the ladder as it moves
+viewer.onFrame = () => { if (viewer.pacing.rung !== noted.rung || viewer.pacing.scale !== noted.scale) drawGraphics(); };
+let noted = { rung: 0, scale: 1 };
 
 GRAPHICS.forEach((g) => {
   const option = document.createElement('option');

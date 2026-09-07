@@ -51,7 +51,11 @@ final quality at full detail, for looking at rather than playing on, and
 is only ever chosen. The choice is kept across visits, and so is the
 measurement, so the page opens at the right size before its first frame.
 The note under the picker says what was measured, in milliseconds per
-megapixel.
+megapixel — and, below whichever tier is chosen, what the renderer has
+had to give up to keep up: it times its frames as it goes, draws at fewer
+pixels first, and then, one at a time, without the supersample, with
+coarser soft shadows, without the contact shading, and with the men cast
+at fewer triangles. It gives each back when there is room.
 
 ## The opponent
 
