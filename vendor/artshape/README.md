@@ -7,7 +7,7 @@ Taken from `artshape` at commit `15f701eadc9213aaec8bcdc3276841e4789f482c`, Sept
 `gpu/context.ts`, `render/viewer.ts`, `render/calibrate.ts`,
 `render/shaders.ts` and the calibration's edits to `render/renderer.ts`
 (two getters, the economy, the frame's `shadowTaps`) brought up to
-`60fbca1`, the calibration, the ladder, and `pending` counting a bake between its chunks.
+`56a7490`: the calibration, the ladder, `pending` counting a bake between its chunks, and a fallback adapter starting low.
 
 ## What was copied
 
