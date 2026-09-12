@@ -18,8 +18,11 @@ Needs WebGPU: a current Chrome, Edge or Safari.
 Pick a side and a level, and move. A man can be dragged — press on him
 and he lifts off the board and follows the pointer — or clicked and then
 clicked again on the square he is to go to. Either way the squares he may
-go to light: a green disc for an empty square, a red ring round a man who
-may be taken. The last move played keeps a blue-green ring at each end.
+go to light — and they are lit, not marked: a pool of green over an empty
+square, red over a man who may be taken, amber under the man in hand, and
+a dim blue at both ends of the last move played. He is then carried to
+his square rather than appearing on it, and a man taken is swept off to
+the tray beside the board.
 
 The view only moves while the meta key is held: ⌘-drag turns the board,
 ⌘-scroll comes closer, ⌘-right-drag pans. Without it the pointer belongs
@@ -45,20 +48,20 @@ your own men.
 ## Graphics
 
 The page measures the machine it opens on: once the set is on screen it
-times a few frames and chooses. **Auto** is that choice — `balanced` on a
-desktop, `fast` on a laptop with an integrated GPU, where the men are cast
-with fewer triangles and drawn at fewer pixels. **Fine** is the renderer's
-final quality at full detail, for looking at rather than playing on, and
-is only ever chosen. The choice is kept across visits, and so is the
-measurement, so the page opens at the right size before its first frame.
-The note under the picker says what was measured, in milliseconds per
-megapixel — and, below whichever tier is chosen, what the renderer has
-had to give up to keep up: it times its frames as it goes, draws at fewer
-pixels first, and then, one at a time, without the supersample, with
-coarser soft shadows, without the contact shading, and with the men cast
-at fewer triangles. It gives each back when there is room. Clicking the
-note copies a report of all of it — the adapter, what was measured,
-every step the renderer took and why — to paste to whoever is tuning it.
+times sixty frames, fenced on the queue and at 1920×1080 rather than at
+whatever the pane happens to be, and chooses. **Auto** is that choice —
+`fine` under three milliseconds a frame, `balanced` under seven, `fast`
+past that, where the men are cast with fewer triangles, the mist over the
+board is turned off and the frame is drawn at three quarters of the
+pixels. The choice is kept across visits. The note under the picker says
+what was measured and what is being given up for it; clicking it copies a
+report — the adapter, the frame time, the tier, the detail — to paste to
+whoever is tuning it.
+
+There is no ladder. The still-life renderer had one, climbed and given
+back as a frame allowed, because a still frame of this set cost some
+twenty milliseconds; the game path draws one in two or three, and a thing
+that never runs out of room does not need a ladder to climb.
 
 ## The opponent
 
@@ -84,8 +87,9 @@ The search runs in a worker, so the board stays turnable while it thinks.
 
     src/chess/     the rules, the notation, the game, the engine, its worker
     src/scene/     the set as sketches, and the set on the renderer
+    src/stage/     where it is drawn: the game path, and the photograph
     src/ray.ts     a point on the canvas into a ray in the board's millimetres
-    src/main.ts    the page: the look, the pointer, the panel
+    src/main.ts    the page: the game, the pointer, the panel
 
 The drawing is all `artshape-render`, a dependency: the parts, the
 assembly, the language and the renderer. It was vendored into `vendor/`
@@ -143,8 +147,11 @@ both plies, and the board turns round when you play black.
 
 ## What it costs to load
 
-The bundle is 365 kB, 117 kB over the wire, and the game is on screen in
-about a quarter of a second on a warm device. It sends none of the path
+The bundle is 428 kB, 137 kB over the wire, and the game is on screen in
+about a quarter of a second on a warm device. It carries both renderers:
+the game path the set is played on and the still-life path it is
+photographed on, the second of which is built only when the Photograph
+button is first pressed. It sends none of the path
 tracer: the renderer fetches that on the first traced frame, and the game
 asks for one from nowhere, so its 46 kB sits on the server unread. Three
 things got the rest of it there, and the numbers are worth keeping
@@ -167,119 +174,60 @@ because each was measured rather than guessed:
   sees. `wgsl-minify.ts` takes it out of a production build only:
   **a tenth of the bundle**, and it costs the reader nothing.
 
-## The lamp spike
+## How it is drawn
 
-`lamp.html` (`npm run dev`, then `/lamp.html`) draws the same set on the
-renderer's *other* path — `game/`, which draws every frame and has the
-cone lights, the volumetric fog and the GPU particles that the still-life
-path does not and will not. It is an experiment, not a mode: nothing in
-`main.ts` knows about it, and it is one directory to delete.
+The set is drawn on the library's **game path** — `game/`, which draws
+every frame — and photographed on its **still-life path**, `render/`,
+which draws one picture beautifully. Both live in `src/stage/`, over one
+device and one canvas.
 
-It asks three questions and answers them.
+**Playing.** A pendant hangs over a far corner of the board and is tilted
+back at the middle: a cone with a shadow map of its own, so the men throw
+wedges that soften with the distance from the lamp, and with a little
+mist in the air the beam is visible over the board. Where it hangs is not
+a detail — dead centre and aimed straight down, every man's shadow falls
+under his own base, where his base covers it, and the board looks unlit
+by anything with a direction.
 
-**Does the set survive the simpler material?** Mostly yes. `game/` holds
-one albedo and one roughness a placement, with `f0 = albedo`, so
-everything over there is a metal; `src/spike/materials.ts` is the
-crossing, and it is unit-tested because its two failure modes look like
-lighting bugs. Silver reads as silver, gold as gold, and the board's
-enamel squares as white and black. What is lost: the enamel's glow of the
-metal beneath it, the pearls' orient, the stones' fire, the table's
-reflection, the contact shadow, and the tracer. The men look like a chess
-set in a dark room rather than like a photograph of one on a bench.
+The legal squares are **lit rather than marked**: a small cone hung a
+hand's breadth over each, green for a quiet move, red for a capture,
+amber under the man in hand and blue at both ends of the last move. Two
+things had to be right. The pendant must not light the whole board, or a
+pool has nothing to be brighter than; and a pool must be saturated rather
+than bright, because at three times the pendant its middle clips to white
+and a capture reads like a quiet move.
 
-**Is a pendant lamp better than a sky?** Yes, and it is the whole reason
-to go. One cone with a shadow map pools on four or five files and lets
-the rest fall away; the men throw wedges that soften with the distance
-from the lamp; and with a little fog the beam is visible in the air above
-the board.
+And the men **move**: lifted, carried along an eased arc and set down,
+the rook going with his king in a castling, the man taken swept off to
+his tray rather than vanishing under the man who took him, and a little
+dust where each lands. The rules do not wait for any of it — the move is
+played the moment it is made, and only the drawing lags, because an
+animation the rules wait on is an animation that can lose a click.
 
-**Where it hangs is not a detail.** The first version hung it dead centre
-and aimed it straight down, and the board came out looking as though the
-lamp cast nothing at all — every man's shadow fell directly under his own
-base, where his base covered it. Hung over a far corner and tilted back
-at the middle, the same lamp rakes the whole board. The renderer was
-never at fault: a man lifted clear of the board threw a sharp shadow the
-whole time, which is the test that settled it in one look after an hour
-of measuring the wrong things.
+What that costs, fenced at 1920×1080, medians of five runs of sixty
+frames with the set standing at the opening position: **1.61 ms a frame**
+with everything on, 0.80 without the mist, 0.70 without the film as well.
+So the mist is half the frame and everything else together is the other
+half, and a machine that cannot hold sixty frames a second here is a
+machine that cannot draw a board at all. The
+still-life path's shader is about 11 ms a megapixel — some 23 ms at that
+size — which it affords by drawing only when something changes.
 
-**Can the legal moves be light instead of enamel discs?** Yes, and the
-markers are not drawn at all on that page. Each destination is a small
-cone hung a hand's breadth over its square — green for a quiet move, red
-for a capture, amber over the man in hand, blue at both ends of the last
-move. Two things had to be got right: the pendant must not light the
-whole board, or a pool has nothing to be brighter than; and a pool must
-be saturated rather than bright, because at three times the pendant the
-middle clips to white and a capture reads like a quiet move.
+**Photographing.** The Photograph button hands the same position to
+`render/`: the same table, the same lamp, and the enamel over its metal,
+the stones, the contact shadow and the table's reflection that one albedo
+and one roughness a placement cannot hold. `t` then fetches the path
+tracer and accumulates toward a thousand samples. The still renderer is
+built on the first photograph and not before — 63 ms to build, the
+picture at once, four seconds or so for the bakes to settle, 1.2 s to the
+first traced sample — so a game that is never photographed pays nothing
+for it.
 
-**Do the moves animate?** They do, and that is the part that could not
-have been had on the other path at all. A man is lifted, carried along an
-eased arc and set down; the rook of a castling goes with his king; the man
-taken is swept off the board to his tray rather than vanishing under the
-man who took him; and a little dust comes up where each lands — the first
-use the particles have had here. The amber pool travels under the man in
-hand, which is what says a move is happening rather than having happened.
-
-The model plays the move the instant the click lands — the position, the
-turn and the legal moves are all correct straight away — and only where
-the men are *drawn* lags behind. An animation the rules wait on is an
-animation that can lose a click.
-
-**And can the still-life path still take the photograph?** Yes, over the
-same device and the same canvas, which is the whole of why this is worth
-doing: `render/` takes a callback for the view it draws into rather than
-owning a canvas, so `p` hands the board from one renderer to the other
-with nothing copied anywhere. The photograph is the set on a walnut table
-under the same pendant the game is played under — a rig light standing in
-the scene, which `render/` has been able to hold since v0.13.0 — with the
-enamel, the stones, the contact shadow and the table's reflection the game
-path cannot. `t` then fetches the path tracer and accumulates toward a
-thousand samples.
-
-The still renderer is built on the first photograph and not before: a
-game that is never photographed pays nothing. Measured on a Mac mini:
-
-| | |
-| --- | ---: |
-| building the still renderer, once | 63 ms |
-| the picture, drawn | at once |
-| settling: the bakes, landing in chunks | 4.3–4.5 s |
-| the tracer fetched, the scene built, the first sample | 1.2 s |
-
-The settling is paid on every photograph and not only the first, because
-men who have moved invalidate the sky-occlusion bake. The picture is there
-from the first frame and improves under you; the only thing that would
-make it feel faster is opening at draft quality and escalating, which is
-what the editor does.
-
-**One trap worth writing down.** The orbit eases toward its target and
-never exactly arrives, so a test for "has the camera moved at all" says
-yes forever — and a still renderer told the view is moving never settles,
-never bakes, and never finishes the photograph. The threshold is a
-twentieth of a millimetre, not an epsilon.
-
-**What it costs.** Fenced on the queue at 1920×1080, medians of five runs
-of sixty frames, with the lamp shadowed, the trays lit and the mist in the
-air:
-
-| | ms a frame |
-| --- | ---: |
-| everything on | 1.81 |
-| without the fog | 1.00 |
-| without the fog or the point lights | 0.75 |
-| without the fog, the lights or the post chain | 0.71 |
-
-So the fog is 0.8 ms, the eight-odd point lights 0.25, the post chain 0.04,
-and a burst of dust in the air about 0.3 while it lasts. For comparison the
-still-life path's shader is about 11 ms a megapixel on the pixels it
-covers, or some 23 ms at that size — which it affords by drawing only when
-something changes, and which is exactly why a lit, animated board wants
-the other path.
-
-**One number worth carrying away.** `fog.cones` is a ratio between what a
-lamp puts in the air and what it puts on a surface, and the library's
-default of 1 is set for an arena's lamp six metres up. Over a chessboard,
-where the lamp is 260 mm from everything it lights, 1 washed the whole
-frame grey; 0.32 is a beam you can see through.
+**One trap, written down because it cost an hour.** The orbit eases
+toward its target and never exactly arrives, so a test for "has the
+camera moved at all" answers yes for ever, and a still renderer told the
+view is moving never settles, never bakes and never finishes its picture.
+The threshold is a twentieth of a millimetre, not an epsilon.
 
 ## Deploying
 

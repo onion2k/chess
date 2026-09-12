@@ -39,6 +39,8 @@ export class Photo {
    */
   timings = { build: 0, settle: 0 };
   private openedAt = 0;
+  /** Whether anything has been pending since the photograph was opened. */
+  private waited = false;
 
   constructor(private ctx: Gpu, private canvas: HTMLCanvasElement) {}
 
@@ -47,7 +49,22 @@ export class Photo {
    * meshes the game path draws, with the materials it cannot hold: enamel,
    * nacre, the stones, and a finish per part.
    */
-  private build(groups: InstanceGroup[], bounds: Box3): Promise<StillRenderer> {
+  /**
+   * The groups to draw. They are the set's own — the same meshes the game
+   * path draws, with the materials it cannot hold — and they are kept rather
+   * than uploaded, since the renderer that would take them may not exist yet.
+   */
+  setScene(groups: InstanceGroup[]) {
+    this.groups = groups;
+    this.renderer?.setInstanced(groups);
+  }
+
+  /** A man has moved while the photograph is open: the engine's reply, say. */
+  restand(updates: Placed[]) {
+    this.renderer?.moveAll(updates);
+  }
+
+  private build(bounds: Box3): Promise<StillRenderer> {
     if (this.built) return this.built;
     this.stage = 'building';
     const started = performance.now();
@@ -65,7 +82,7 @@ export class Photo {
       renderer.setEnvStrength(0.16);
       renderer.setKeyLight({ elevation: 0.9, azimuth: -0.5, strength: 0.12, warmth: 0.2, size: 0.3 });
       renderer.setFilm({ tonemap: 1, vignette: 0.28, grain: 0.18, fringe: 0.25 });
-      renderer.setInstanced(groups);
+      renderer.setInstanced(this.groups);
       renderer.frameBounds(bounds);
       this.renderer = renderer;
       this.timings.build = performance.now() - started;
@@ -75,22 +92,24 @@ export class Photo {
   }
 
   /** Where the pendant hangs in the played scene, so the photograph shares it. */
-  lamp: { at: [number, number, number]; aim: [number, number, number]; cone: [number, number]; strength: number } | null = null;
+  lamp: { at: [number, number, number]; aim: [number, number, number]; cone: [number, number]; strength: number; radius: number } | null = null;
+  /** The set, as the still path holds it: markers, enamel, stones and all. */
+  private groups: InstanceGroup[] = [];
 
   /**
    * Take over: build if this is the first time, stand the men where they
    * stand, hang the lamp where the game hangs it, and point the camera where
    * the game's camera was pointing.
    */
-  async open(groups: InstanceGroup[], bounds: Box3, place: () => Placed[], from: Camera) {
-    const renderer = await this.build(groups, bounds);
+  async open(bounds: Box3, place: () => Placed[], from: Camera) {
+    const renderer = await this.build(bounds);
     if (this.lamp) {
       renderer.setRig([{
         elevation: 0, azimuth: 0, warmth: 0.22,
         strength: this.lamp.strength,
-        // the lamp's own width: a shade a few centimetres across, so a man's
-        // shadow is sharp at his foot and soft where it reaches the board's edge
-        size: 14,
+        // the shade's own width, so a man's shadow is sharp at his foot and
+        // soft where it reaches the board's edge
+        size: this.lamp.radius,
         at: this.lamp.at, aim: this.lamp.aim, cone: this.lamp.cone,
       }]);
     }
@@ -100,6 +119,7 @@ export class Photo {
     renderer.requestRender();
     this.stage = 'raster';
     this.openedAt = performance.now();
+    this.waited = false;
     // timed afresh every photograph: the first pays for the bakes from
     // nothing, and a later one only for what the moved men changed
     this.timings.settle = 0;
@@ -138,9 +158,13 @@ export class Photo {
     if (!r || this.stage === 'off' || this.stage === 'building') return false;
     r.setMoving(moving);
     const drew = r.render(view);
-    // the bakes land in chunks with gaps where nothing is due, so what is
-    // timed is the whole settling and not the first frame of it
-    if (!r.pending && !this.timings.settle && this.openedAt) this.timings.settle = performance.now() - this.openedAt;
+    // The bakes land in chunks with gaps where nothing is due, so what is
+    // timed is the whole settling and not the first frame of it — and the
+    // clock only stops once there has been something to wait for. Asked on
+    // the frame the photograph opens, before the first bake is queued,
+    // nothing is pending and the answer is a millisecond.
+    if (r.pending) this.waited = true;
+    else if (this.waited && !this.timings.settle && this.openedAt) this.timings.settle = performance.now() - this.openedAt;
     return drew;
   }
 

@@ -24,11 +24,6 @@ export default defineConfig(({ command, isPreview }) => ({
   // the renderer is TypeScript sources rather than a build: transformed like
   // the game's own code rather than pre-bundled, so its workers keep their URLs
   optimizeDeps: { exclude: ['artshape-render'] },
-  // top-level await in main.ts: the WebGPU device is requested asynchronously.
-  // `lamp.html` is the game-path spike, built alongside the game so that it
-  // cannot rot without the build saying so.
-  build: {
-    target: 'es2022',
-    rollupOptions: { input: { main: 'index.html', lamp: 'lamp.html' } },
-  },
+  // top-level await in main.ts: the WebGPU device is requested asynchronously
+  build: { target: 'es2022' },
 }));
