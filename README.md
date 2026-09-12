@@ -224,6 +224,37 @@ turn and the legal moves are all correct straight away — and only where
 the men are *drawn* lags behind. An animation the rules wait on is an
 animation that can lose a click.
 
+**And can the still-life path still take the photograph?** Yes, over the
+same device and the same canvas, which is the whole of why this is worth
+doing: `render/` takes a callback for the view it draws into rather than
+owning a canvas, so `p` hands the board from one renderer to the other
+with nothing copied anywhere. The photograph is the set on a walnut table
+under a studio rig, with the enamel, the stones, the contact shadow and
+the table's reflection the game path cannot hold — and `t` then fetches
+the path tracer and accumulates toward a thousand samples.
+
+The still renderer is built on the first photograph and not before: a
+game that is never photographed pays nothing. Measured on a Mac mini:
+
+| | |
+| --- | ---: |
+| building the still renderer, once | 63 ms |
+| the picture, drawn | at once |
+| settling: the bakes, landing in chunks | 4.3–4.5 s |
+| the tracer fetched, the scene built, the first sample | 1.2 s |
+
+The settling is paid on every photograph and not only the first, because
+men who have moved invalidate the sky-occlusion bake. The picture is there
+from the first frame and improves under you; the only thing that would
+make it feel faster is opening at draft quality and escalating, which is
+what the editor does.
+
+**One trap worth writing down.** The orbit eases toward its target and
+never exactly arrives, so a test for "has the camera moved at all" says
+yes forever — and a still renderer told the view is moving never settles,
+never bakes, and never finishes the photograph. The threshold is a
+twentieth of a millimetre, not an epsilon.
+
 **What it costs.** Fenced on the queue at 1920×1080, medians of five runs
 of sixty frames, with the lamp shadowed, the trays lit and the mist in the
 air:

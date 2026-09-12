@@ -40,6 +40,7 @@ import { Game } from '../chess/game';
 import { A1, LIFT, SQUARE, SetScene, TOP, squareCentre, type Standing } from '../scene/scene';
 import { onPlane, rayThrough } from '../ray';
 import { asGameGroup } from './materials';
+import { Photo } from './photo';
 
 // --- the set ------------------------------------------------------------
 
@@ -235,6 +236,7 @@ function resize() {
   canvas.width = width; canvas.height = height;
   camera.aspect = width / height;
   renderer.resize(width, height);
+  photo.resize(width, height);
 }
 window.addEventListener('resize', resize);
 
@@ -453,6 +455,27 @@ function carrying(dt: number): boolean {
   return true;
 }
 
+// --- the photograph -----------------------------------------------------
+
+/**
+ * The still-life renderer, over the same device and the same canvas. It is
+ * built on the first photograph, which is why `p` takes a moment the first
+ * time and none after it.
+ */
+const photo = new Photo(ctx, canvas);
+
+/**
+ * What the photograph is framed round. The board is 176 mm across its
+ * squares and the frame a little more; the men stand 40 at the tallest, and
+ * the trays lie outside it and are not in the picture.
+ */
+const BOARD_BOUNDS = { min: [-110, -110, -8] as [number, number, number], max: [110, 110, 60] as [number, number, number] };
+
+async function photograph() {
+  if (photo.stage !== 'off') { photo.close(); return; }
+  await photo.open(scene.groups, BOARD_BOUNDS, () => scene.place(standing()), camera);
+}
+
 // --- the frame ----------------------------------------------------------
 
 let frames = 0;
@@ -461,6 +484,8 @@ let fps = 0;
 let fenced = 0;
 
 let lastFrame = performance.now();
+/** Where the camera was last frame: the still path wants telling when it moves. */
+let watched: [number, number, number] = [0, 0, 0];
 
 function tick() {
   resize();
@@ -472,17 +497,35 @@ function tick() {
   lastFrame = now0;
   const moving = carrying(dt);
   const [count, moves] = lights();
-  renderer.frame(ctx.context.getCurrentTexture().createView(), 'redraw', dt);
+  const view = () => ctx.context.getCurrentTexture().createView();
+  if (photo.stage === 'off') {
+    renderer.frame(view(), 'redraw', dt);
+  } else {
+    // The photograph is taken from wherever the game was being watched, and
+    // the still path is told when the view is moving so it can stand aside.
+    // The threshold is a twentieth of a millimetre and not an epsilon: the
+    // orbit eases toward its target and never arrives exactly, so a test for
+    // any change at all reports a camera that is always moving — and a still
+    // renderer that is told the view is moving never settles, never bakes,
+    // and never draws the photograph it was asked for.
+    const turning = camera.position.some((v, i) => Math.abs(v - watched[i]) > 0.05);
+    if (turning) photo.follow(camera);
+    photo.render(view, turning);
+  }
+  watched = [...camera.position] as [number, number, number];
 
   frames++;
   const now = performance.now();
   if (now - since > 500) {
     fps = Math.round((frames * 1000) / (now - since));
     frames = 0; since = now;
-    hud.textContent = `${fps} fps · ${count} lights (${moves} moves lit)`
-      + (fenced ? ` · ${fenced.toFixed(2)} ms fenced` : ' · press m to measure')
-      + ` · ${game.position.turn === 'w' ? 'white' : 'black'} to move`
-      + (moving ? ' · carrying' : '');
+    hud.textContent = photo.stage !== 'off'
+      ? `${photo.status} · p to go back`
+      : `${fps} fps · ${count} lights (${moves} moves lit)`
+        + (fenced ? ` · ${fenced.toFixed(2)} ms fenced` : ' · press m to measure')
+        + ` · ${game.position.turn === 'w' ? 'white' : 'black'} to move`
+        + (moving ? ' · carrying' : '')
+        + ' · p to photograph';
   }
   requestAnimationFrame(tick);
 }
@@ -519,6 +562,8 @@ async function measure(runs = 90, width = 1920, height = 1080) {
 }
 
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'p') void photograph();
+  if (e.key === 't') photo.trace();
   if (e.key === 'm') void measure();
   if (e.key === 'f') renderer.fog = { ...renderer.fog, density: renderer.fog.density > 0 ? 0 : 9e-4 };
   if (e.key === 'l') renderer.economy = { ...renderer.economy, points: renderer.economy.points === false };
@@ -544,4 +589,4 @@ function play(from: string, to: string) {
   return move;
 }
 
-Object.assign(window as unknown as Record<string, unknown>, { renderer, camera, orbit, game, lamp, moves, measure, select, play });
+Object.assign(window as unknown as Record<string, unknown>, { renderer, camera, orbit, game, lamp, moves, measure, select, play, photo, photograph });
