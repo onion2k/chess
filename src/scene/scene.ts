@@ -153,6 +153,11 @@ export class SetScene {
     }
   }
 
+  /** What a group belongs to: the board, a side, or the markers. */
+  roleOf(index: number): Role {
+    return this.roles[index];
+  }
+
   private push(group: InstanceGroup, role: Role) {
     this.groups.push(group);
     this.roles.push(role);

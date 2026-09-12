@@ -167,6 +167,65 @@ because each was measured rather than guessed:
   sees. `wgsl-minify.ts` takes it out of a production build only:
   **a tenth of the bundle**, and it costs the reader nothing.
 
+## The lamp spike
+
+`lamp.html` (`npm run dev`, then `/lamp.html`) draws the same set on the
+renderer's *other* path — `game/`, which draws every frame and has the
+cone lights, the volumetric fog and the GPU particles that the still-life
+path does not and will not. It is an experiment, not a mode: nothing in
+`main.ts` knows about it, and it is one directory to delete.
+
+It asks three questions and answers them.
+
+**Does the set survive the simpler material?** Mostly yes. `game/` holds
+one albedo and one roughness a placement, with `f0 = albedo`, so
+everything over there is a metal; `src/spike/materials.ts` is the
+crossing, and it is unit-tested because its two failure modes look like
+lighting bugs. Silver reads as silver, gold as gold, and the board's
+enamel squares as white and black. What is lost: the enamel's glow of the
+metal beneath it, the pearls' orient, the stones' fire, the table's
+reflection, the contact shadow, and the tracer. The men look like a chess
+set in a dark room rather than like a photograph of one on a bench.
+
+**Is a pendant lamp better than a sky?** Yes, and it is the whole reason
+to go. One cone with a shadow map, hung 260 mm over the middle at nine
+and twenty degrees, pools on the centre four files and lets the outer
+ones fall away; the men throw wedges that soften with the distance from
+the lamp; and with a little fog the beam is visible in the air above the
+board.
+
+**Can the legal moves be light instead of enamel discs?** Yes, and the
+markers are not drawn at all on that page. Each destination is a small
+cone hung a hand's breadth over its square — green for a quiet move, red
+for a capture, amber over the man in hand, blue at both ends of the last
+move. Two things had to be got right: the pendant must not light the
+whole board, or a pool has nothing to be brighter than; and a pool must
+be saturated rather than bright, because at three times the pendant the
+middle clips to white and a capture reads like a quiet move.
+
+**What it costs.** Fenced on the queue at 2048×1536 — three megapixels,
+which is more than the game is ever drawn at — with the lamp shadowed,
+six lights and the mist:
+
+| | ms a frame |
+| --- | ---: |
+| everything on | 2.7 |
+| without the fog | 1.3 |
+| without the fog or the post chain | 1.26 |
+| geometry and the sun alone | 0.85 |
+
+The fog is 1.4 ms of it and the six point lights 0.4. For comparison the
+still-life path's shader is about 11 ms a megapixel on the pixels it
+covers, or some 34 ms at that size — which it gets away with because it
+draws only when something changes, and which is exactly why a lit,
+animated board wants the other path.
+
+**One number worth carrying away.** `fog.cones` is a ratio between what a
+lamp puts in the air and what it puts on a surface, and the library's
+default of 1 is set for an arena's lamp six metres up. Over a chessboard,
+where the lamp is 260 mm from everything it lights, 1 washed the whole
+frame grey; 0.32 is a beam you can see through.
+
 ## Deploying
 
 Every push to `main` builds the game and puts it on GitHub Pages, by the
