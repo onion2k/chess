@@ -229,9 +229,11 @@ same device and the same canvas, which is the whole of why this is worth
 doing: `render/` takes a callback for the view it draws into rather than
 owning a canvas, so `p` hands the board from one renderer to the other
 with nothing copied anywhere. The photograph is the set on a walnut table
-under a studio rig, with the enamel, the stones, the contact shadow and
-the table's reflection the game path cannot hold — and `t` then fetches
-the path tracer and accumulates toward a thousand samples.
+under the same pendant the game is played under — a rig light standing in
+the scene, which `render/` has been able to hold since v0.13.0 — with the
+enamel, the stones, the contact shadow and the table's reflection the game
+path cannot. `t` then fetches the path tracer and accumulates toward a
+thousand samples.
 
 The still renderer is built on the first photograph and not before: a
 game that is never photographed pays nothing. Measured on a Mac mini:

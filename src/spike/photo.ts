@@ -55,11 +55,15 @@ export class Photo {
       const renderer = new StillRenderer(this.ctx, {});
       await renderer.ready;
       renderer.setSize(this.canvas.width, this.canvas.height);
-      // a bench, not a room: the piece on a table under a studio rig, which
-      // is what this renderer is for and what the game path cannot do
+      // The same room the game is played in: a table, a dark sky, and the
+      // pendant overhead — which this renderer can hold since v0.13.0, a rig
+      // light being allowed to stand in the scene rather than hang in the
+      // sky. Before that the photograph was a studio bench shot and the two
+      // views shared only their geometry.
       renderer.setEnvironment('studio');
       renderer.setTable('walnut');
-      renderer.setKeyLight({ elevation: 0.72, azimuth: -0.6, strength: 1.15, warmth: 0.25, size: 0.22 });
+      renderer.setEnvStrength(0.16);
+      renderer.setKeyLight({ elevation: 0.9, azimuth: -0.5, strength: 0.12, warmth: 0.2, size: 0.3 });
       renderer.setFilm({ tonemap: 1, vignette: 0.28, grain: 0.18, fringe: 0.25 });
       renderer.setInstanced(groups);
       renderer.frameBounds(bounds);
@@ -70,12 +74,26 @@ export class Photo {
     return this.built;
   }
 
+  /** Where the pendant hangs in the played scene, so the photograph shares it. */
+  lamp: { at: [number, number, number]; aim: [number, number, number]; cone: [number, number]; strength: number } | null = null;
+
   /**
    * Take over: build if this is the first time, stand the men where they
-   * stand, and point the camera where the game's camera was pointing.
+   * stand, hang the lamp where the game hangs it, and point the camera where
+   * the game's camera was pointing.
    */
   async open(groups: InstanceGroup[], bounds: Box3, place: () => Placed[], from: Camera) {
     const renderer = await this.build(groups, bounds);
+    if (this.lamp) {
+      renderer.setRig([{
+        elevation: 0, azimuth: 0, warmth: 0.22,
+        strength: this.lamp.strength,
+        // the lamp's own width: a shade a few centimetres across, so a man's
+        // shadow is sharp at his foot and soft where it reaches the board's edge
+        size: 14,
+        at: this.lamp.at, aim: this.lamp.aim, cone: this.lamp.cone,
+      }]);
+    }
     renderer.moveAll(place());
     this.follow(from);
     renderer.setQuality('final');

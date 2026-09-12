@@ -473,6 +473,8 @@ const BOARD_BOUNDS = { min: [-110, -110, -8] as [number, number, number], max: [
 
 async function photograph() {
   if (photo.stage !== 'off') { photo.close(); return; }
+  // the photograph is taken under the same lamp the game is played under
+  photo.lamp = { at: lamp.at, aim: [0, 0, TOP], cone: lamp.cone, strength: 3.4 };
   await photo.open(scene.groups, BOARD_BOUNDS, () => scene.place(standing()), camera);
 }
 
