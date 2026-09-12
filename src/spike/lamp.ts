@@ -35,9 +35,9 @@ import { Orbit } from 'artshape-render/gpu/camera';
 import { bakeEnvironment } from 'artshape-render/render/env';
 import { GameRenderer, type GameGroup } from 'artshape-render/game/renderer';
 import { LightPool, type PointLight } from 'artshape-render/game/lights';
-import { colourOf, square, squareFromName, typeOf, type Colour, type Move } from '../chess/board';
+import { colourOf, square, squareFromName, typeOf, type Colour, type Move, type PieceType } from '../chess/board';
 import { Game } from '../chess/game';
-import { A1, SQUARE, SetScene, TOP, squareCentre, type Standing } from '../scene/scene';
+import { A1, LIFT, SQUARE, SetScene, TOP, squareCentre, type Standing } from '../scene/scene';
 import { onPlane, rayThrough } from '../ray';
 import { asGameGroup } from './materials';
 
@@ -61,19 +61,86 @@ scene.groups.forEach((group, i) => {
   movers.push(asGameGroup(group));
 });
 
-/** Every man standing where he stands, as the game's own `standing` does it. */
+/**
+ * A man on his way somewhere: lifted off one square and set down on another,
+ * or swept off the board to his side's tray.
+ *
+ * The model plays the move at once — the position, the turn and the legal
+ * moves are all correct the instant the click lands — and this only changes
+ * where the men are *drawn* while the hand is still moving. That ordering is
+ * deliberate: an animation that the rules wait for is an animation that can
+ * lose a click, and the still-life path's own answer to a man being carried
+ * is the same one.
+ */
+interface Carry {
+  colour: Colour;
+  type: PieceType;
+  from: [number, number, number];
+  to: [number, number, number];
+  turn: number;
+  /** How high he rises on the way. */
+  lift: number;
+  /** Seconds along, and how many it takes. */
+  t: number;
+  span: number;
+  /** The square he is bound for, so the man the model already put there is not drawn twice. */
+  hides: number | null;
+  /** A man being taken is not one being moved: he leaves no puff where he lands. */
+  swept: boolean;
+}
+
+const carries: Carry[] = [];
+
+/** Smooth at both ends: a hand does not start or stop at speed. */
+const ease = (t: number) => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t));
+
+/** Where a man is, this far through his carry. */
+function along(c: Carry): [number, number, number] {
+  const k = ease(Math.min(1, c.t / c.span));
+  const hump = Math.sin(Math.PI * Math.min(1, c.t / c.span)) ** 0.8;
+  return [
+    c.from[0] + (c.to[0] - c.from[0]) * k,
+    c.from[1] + (c.to[1] - c.from[1]) * k,
+    c.from[2] + (c.to[2] - c.from[2]) * k + c.lift * hump,
+  ];
+}
+
+/** Where a man taken from the board is set down, beside the board on his own side. */
+function trayPlace(colour: Colour, index: number): [number, number, number] {
+  const column = Math.floor(index / 8);
+  const side = colour === 'w' ? 1 : -1;
+  return [side * (168 + column * 22), (77 - (index % 8) * 22) * side, 0];
+}
+
+const facing = (colour: Colour) => (colour === 'b' ? Math.PI : 0);
+
+/**
+ * Every man to draw: those standing on their squares, those set down in a
+ * tray, and those in flight. A man bound for a square is drawn by his carry
+ * and not by the square, or he would be in two places at once — the model has
+ * already put him where he is going.
+ */
 function standing(): Standing[] {
   const men: Standing[] = [];
+  const hidden = new Set(carries.map((c) => c.hides).filter((sq): sq is number => sq !== null));
   for (let rank = 0; rank < 8; rank++) {
     for (let file = 0; file < 8; file++) {
       const sq = square(file, rank);
       const piece = game.position.board[sq];
-      if (!piece) continue;
+      if (!piece || hidden.has(sq)) continue;
       const colour = colourOf(piece);
       const [x, y] = squareCentre(sq);
-      men.push({ colour, type: typeOf(piece), at: [x, y, TOP], turn: colour === 'b' ? Math.PI : 0 });
+      men.push({ colour, type: typeOf(piece), at: [x, y, TOP], turn: facing(colour) });
     }
   }
+  // the taken, in their trays — all but the one still being carried there
+  const taken = { w: 0, b: 0 };
+  const sweeping = carries.filter((c) => c.swept).length;
+  const done = game.captured();
+  done.slice(0, done.length - sweeping).forEach((man) => {
+    men.push({ ...man, at: trayPlace(man.colour, taken[man.colour]++), turn: facing(man.colour) });
+  });
+  for (const c of carries) men.push({ colour: c.colour, type: c.type, at: along(c), turn: c.turn });
   return men;
 }
 
@@ -156,7 +223,11 @@ const orbit = new Orbit(camera, {
 // what the lamp is for, and a view straight down the way sees none of it
 orbit.setSpherical({ polar: 1.12, radius: 380 });
 
+/** Set while a measurement holds the target at a size of its own. */
+let measuring = false;
+
 function resize() {
+  if (measuring) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const width = Math.max(1, Math.round(canvas.clientWidth * dpr));
   const height = Math.max(1, Math.round(canvas.clientHeight * dpr));
@@ -196,6 +267,12 @@ const lamp = {
  * board reads as a dirty square rather than as a lit one.
  */
 const moves = {
+  /**
+   * How long a carry takes, against a hand's pace. One is the pace the page
+   * plays at; turning it up in the console is how the arc and the dust were
+   * looked at, since a move is over in a third of a second.
+   */
+  pace: 1,
   height: 34,
   radius: 80,
   cone: [9, 20] as [number, number],
@@ -229,11 +306,34 @@ function lights(): number[] {
     intensity: lamp.intensity, direction: [0, 0, -1], cone: lamp.cone,
   });
 
+  // The trays, dimly. The men taken stand outside the pendant's cone, and a
+  // set where the taken men are simply not there is a set that looks like it
+  // is losing pieces rather than winning them: two wide, weak cones put them
+  // in the room without taking anything off the board.
+  for (const side of [1, -1]) {
+    pool.add({
+      position: [side * 190, 0, TOP + 150], radius: 260, colour: [0.85, 0.88, 1],
+      intensity: 7, direction: [0, 0, -1], cone: [26, 52],
+    });
+  }
+
   const options = chosen === null ? [] : game.legal().filter((m) => m.from === chosen);
   const quiet = new Set<number>(), capture = new Set<number>();
   for (const move of options) (move.captured ? capture : quiet).add(move.to);
   const put = (sq: number, kind: { colour: [number, number, number]; intensity: number }) =>
     pool.add(overSquare(sq, moves.height, moves.radius, kind.colour, kind.intensity, moves.cone));
+  // a man being carried takes his own light with him: the amber pool runs
+  // across the board under him, which is what says the move is happening
+  // rather than having happened
+  for (const c of carries) {
+    if (c.swept) continue;
+    const at = along(c);
+    pool.add({
+      position: [at[0], at[1], at[2] + moves.height], radius: moves.radius,
+      colour: moves.chosen.colour, intensity: moves.chosen.intensity,
+      direction: [0, 0, -1], cone: moves.cone,
+    });
+  }
   for (const sq of quiet) put(sq, moves.quiet);
   for (const sq of capture) put(sq, moves.capture);
   if (chosen !== null && options.length) put(chosen, moves.chosen);
@@ -268,22 +368,77 @@ function stand() {
   }
 }
 
+/** A man's carry, from one square to another, at a hand's pace. */
+function carry(colour: Colour, type: PieceType, from: [number, number, number], to: [number, number, number], opts: { lift: number; hides: number | null; swept?: boolean }) {
+  const span = (0.18 + Math.hypot(to[0] - from[0], to[1] - from[1]) / 1100) * moves.pace;
+  carries.push({ colour, type, from, to, turn: facing(colour), lift: opts.lift, t: 0, span, hides: opts.hides, swept: opts.swept ?? false });
+}
+
+const onSquare = (sq: number): [number, number, number] => [...squareCentre(sq), TOP] as [number, number, number];
+
+/**
+ * Play a move and set every man it touches moving: the man himself, the rook
+ * of a castling, and the man taken, who is lifted out and carried to the tray
+ * rather than vanishing under the one who took him.
+ */
+function make(move: Move) {
+  const colour = colourOf(move.piece);
+  if (move.captured) {
+    const taken = { colour: colourOf(move.captured), type: typeOf(move.captured) };
+    const index = game.captured().filter((m) => m.colour === taken.colour).length;
+    carry(taken.colour, taken.type, onSquare(move.capturedAt), trayPlace(taken.colour, index), { lift: LIFT * 0.8, hides: null, swept: true });
+  }
+  game.play(move);
+  last = move;
+  chosen = null;
+  // a promoted pawn is carried as the pawn he still is; the model has already
+  // made him a queen, and she is what is set down
+  carry(colour, typeOf(move.piece), onSquare(move.from), onSquare(move.to), { lift: LIFT, hides: move.to });
+  if (move.castle) {
+    const rook = game.position.board[move.castle.rookTo];
+    carry(colour, typeOf(rook), onSquare(move.castle.rookFrom), onSquare(move.castle.rookTo), { lift: LIFT * 0.6, hides: move.castle.rookTo });
+  }
+  stand();
+}
+
 canvas.addEventListener('click', (e) => {
   const sq = squareUnder(e.clientX, e.clientY);
   if (sq === null) return;
   if (chosen !== null) {
     const move = game.legal().find((m) => m.from === chosen && m.to === sq);
-    if (move) {
-      game.play(move);
-      last = move;
-      chosen = null;
-      stand();
-      return;
-    }
+    if (move) { make(move); return; }
   }
   const piece = game.position.board[sq];
   chosen = piece && colourOf(piece) === (game.position.turn as Colour) ? sq : null;
 });
+
+/**
+ * Advance every carry, and set down those that have arrived.
+ *
+ * A man set down raises a little dust: twenty-odd particles, additive and
+ * short-lived, thrown up from the felt. It is the cheapest thing on this page
+ * and it is the one that makes a move feel like it happened — which is the
+ * answer to whether the particles are worth having at all.
+ */
+function carrying(dt: number): boolean {
+  if (!carries.length) return false;
+  for (let i = carries.length - 1; i >= 0; i--) {
+    const c = carries[i];
+    c.t += dt;
+    if (c.t < c.span) continue;
+    const at = c.to;
+    renderer.emit({
+      position: [at[0], at[1], at[2] + 1],
+      velocity: [0, 0, 26], spread: c.swept ? 34 : 18, count: c.swept ? 26 : 18,
+      life: 0.5, lifeSpread: 0.4, size: 1.2, growth: 5,
+      colour: c.swept ? [1, 0.42, 0.3] : [1, 0.92, 0.82], alpha: 0,
+      gravity: 0.04, floor: at[2],
+    });
+    carries.splice(i, 1);
+  }
+  stand();
+  return true;
+}
 
 // --- the frame ----------------------------------------------------------
 
@@ -292,11 +447,19 @@ let since = performance.now();
 let fps = 0;
 let fenced = 0;
 
+let lastFrame = performance.now();
+
 function tick() {
   resize();
   orbit.update();
+  const now0 = performance.now();
+  // a tab that was in the background hands back a step of seconds: clamped,
+  // or every carry on the page arrives at once when it comes forward again
+  const dt = Math.min((now0 - lastFrame) / 1000, 1 / 15);
+  lastFrame = now0;
+  const moving = carrying(dt);
   const [count, moves] = lights();
-  renderer.frame(ctx.context.getCurrentTexture().createView(), 'redraw', 1 / 60);
+  renderer.frame(ctx.context.getCurrentTexture().createView(), 'redraw', dt);
 
   frames++;
   const now = performance.now();
@@ -305,7 +468,8 @@ function tick() {
     frames = 0; since = now;
     hud.textContent = `${fps} fps · ${count} lights (${moves} moves lit)`
       + (fenced ? ` · ${fenced.toFixed(2)} ms fenced` : ' · press m to measure')
-      + ` · ${game.position.turn === 'w' ? 'white' : 'black'} to move`;
+      + ` · ${game.position.turn === 'w' ? 'white' : 'black'} to move`
+      + (moving ? ' · carrying' : '');
   }
   requestAnimationFrame(tick);
 }
@@ -316,7 +480,15 @@ function tick() {
  * compositing, and reads as sixty however slow the frame is, or as nothing at
  * all in a pane that is not on screen.
  */
-async function measure(runs = 90) {
+async function measure(runs = 90, width = 1920, height = 1080) {
+  // and at a size the page names, not the size the window happens to be: a
+  // pane the browser is not showing lays its canvas out at nothing, and a
+  // one-pixel frame reports the driver's overhead as the scene's cost
+  measuring = true;
+  const was: [number, number] = [canvas.width, canvas.height];
+  canvas.width = width; canvas.height = height;
+  camera.aspect = width / height;
+  renderer.resize(width, height);
   await ctx.device.queue.onSubmittedWorkDone();
   const start = performance.now();
   for (let i = 0; i < runs; i++) {
@@ -325,7 +497,11 @@ async function measure(runs = 90) {
   }
   await ctx.device.queue.onSubmittedWorkDone();
   fenced = (performance.now() - start) / runs;
-  console.log(`lamp spike: ${fenced.toFixed(3)} ms a frame at ${canvas.width}×${canvas.height}, ${pool.count} lights`);
+  console.log(`lamp spike: ${fenced.toFixed(3)} ms a frame at ${width}×${height}, ${pool.count} lights`);
+  canvas.width = was[0]; canvas.height = was[1];
+  camera.aspect = was[0] / was[1];
+  renderer.resize(was[0], was[1]);
+  measuring = false;
   return fenced;
 }
 
@@ -351,10 +527,7 @@ function select(name: string) {
 function play(from: string, to: string) {
   const move = game.legal().find((m) => m.from === squareFromName(from) && m.to === squareFromName(to));
   if (!move) return null;
-  game.play(move);
-  last = move;
-  chosen = null;
-  stand();
+  make(move);
   return move;
 }
 

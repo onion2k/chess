@@ -203,22 +203,36 @@ whole board, or a pool has nothing to be brighter than; and a pool must
 be saturated rather than bright, because at three times the pendant the
 middle clips to white and a capture reads like a quiet move.
 
-**What it costs.** Fenced on the queue at 2048×1536 — three megapixels,
-which is more than the game is ever drawn at — with the lamp shadowed,
-six lights and the mist:
+**Do the moves animate?** They do, and that is the part that could not
+have been had on the other path at all. A man is lifted, carried along an
+eased arc and set down; the rook of a castling goes with his king; the man
+taken is swept off the board to his tray rather than vanishing under the
+man who took him; and a little dust comes up where each lands — the first
+use the particles have had here. The amber pool travels under the man in
+hand, which is what says a move is happening rather than having happened.
+
+The model plays the move the instant the click lands — the position, the
+turn and the legal moves are all correct straight away — and only where
+the men are *drawn* lags behind. An animation the rules wait on is an
+animation that can lose a click.
+
+**What it costs.** Fenced on the queue at 1920×1080, medians of five runs
+of sixty frames, with the lamp shadowed, the trays lit and the mist in the
+air:
 
 | | ms a frame |
 | --- | ---: |
-| everything on | 2.7 |
-| without the fog | 1.3 |
-| without the fog or the post chain | 1.26 |
-| geometry and the sun alone | 0.85 |
+| everything on | 1.81 |
+| without the fog | 1.00 |
+| without the fog or the point lights | 0.75 |
+| without the fog, the lights or the post chain | 0.71 |
 
-The fog is 1.4 ms of it and the six point lights 0.4. For comparison the
+So the fog is 0.8 ms, the eight-odd point lights 0.25, the post chain 0.04,
+and a burst of dust in the air about 0.3 while it lasts. For comparison the
 still-life path's shader is about 11 ms a megapixel on the pixels it
-covers, or some 34 ms at that size — which it gets away with because it
-draws only when something changes, and which is exactly why a lit,
-animated board wants the other path.
+covers, or some 23 ms at that size — which it affords by drawing only when
+something changes, and which is exactly why a lit, animated board wants
+the other path.
 
 **One number worth carrying away.** `fog.cones` is a ratio between what a
 lamp puts in the air and what it puts on a surface, and the library's
