@@ -188,11 +188,19 @@ reflection, the contact shadow, and the tracer. The men look like a chess
 set in a dark room rather than like a photograph of one on a bench.
 
 **Is a pendant lamp better than a sky?** Yes, and it is the whole reason
-to go. One cone with a shadow map, hung 260 mm over the middle at nine
-and twenty degrees, pools on the centre four files and lets the outer
-ones fall away; the men throw wedges that soften with the distance from
-the lamp; and with a little fog the beam is visible in the air above the
-board.
+to go. One cone with a shadow map pools on four or five files and lets
+the rest fall away; the men throw wedges that soften with the distance
+from the lamp; and with a little fog the beam is visible in the air above
+the board.
+
+**Where it hangs is not a detail.** The first version hung it dead centre
+and aimed it straight down, and the board came out looking as though the
+lamp cast nothing at all — every man's shadow fell directly under his own
+base, where his base covered it. Hung over a far corner and tilted back
+at the middle, the same lamp rakes the whole board. The renderer was
+never at fault: a man lifted clear of the board threw a sharp shadow the
+whole time, which is the test that settled it in one look after an hour
+of measuring the wrong things.
 
 **Can the legal moves be light instead of enamel discs?** Yes, and the
 markers are not drawn at all on that page. Each destination is a small

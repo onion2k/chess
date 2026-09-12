@@ -246,6 +246,17 @@ window.addEventListener('resize', resize);
  * was arrived at: turn it in the console, look, keep what the eye keeps.
  */
 const lamp = {
+  /**
+   * Where the pendant hangs, in millimetres, and what it looks at.
+   *
+   * Not over the middle. A lamp hung dead centre and aimed straight down puts
+   * every man's shadow directly under his own base, where his base covers it:
+   * the board looks unlit by anything with a direction, and the first version
+   * of this page read as a renderer that had lost its shadows. Hung over the
+   * far edge and tilted back at the middle, the same lamp throws every man
+   * toward the viewer, and the men nearest the camera throw furthest.
+   */
+  at: [45, 120, 240] as [number, number, number],
   /** How high over the board the pendant hangs, in millimetres. */
   height: 260,
   /**
@@ -256,8 +267,8 @@ const lamp = {
    * wide enough to cover the whole board was the first thing tried and it is
    * the reason the move lights below read as tints rather than as pools.
    */
-  cone: [9, 20] as [number, number],
-  intensity: 52,
+  cone: [14, 30] as [number, number],
+  intensity: 60,
 };
 
 /**
@@ -302,8 +313,10 @@ function overSquare(sq: number, height: number, radius: number, colour: [number,
 function lights(): number[] {
   pool.clear();
   pool.add({
-    position: [0, 0, TOP + lamp.height], radius: 900, colour: [1, 0.93, 0.82],
-    intensity: lamp.intensity, direction: [0, 0, -1], cone: lamp.cone,
+    position: lamp.at, radius: 900, colour: [1, 0.93, 0.82],
+    intensity: lamp.intensity,
+    direction: [-lamp.at[0], -lamp.at[1], TOP - lamp.at[2]],
+    cone: lamp.cone,
   });
 
   // The trays, dimly. The men taken stand outside the pendant's cone, and a
